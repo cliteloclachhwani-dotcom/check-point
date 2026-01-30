@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>SECR MONITOR - VIOLATION MODE</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        body { margin: 0; display: flex; font-family: 'Segoe UI', sans-serif; height: 100vh; background: #f0f2f5; }
+        #sidebar { width: 320px; background: #343a40; color: #ffffff; padding: 25px; box-shadow: 2px 0 10px rgba(0,0,0,0.2); z-index: 1000; overflow-y: auto; }
+        #map { flex: 1; position: relative; }
+        .stats-box { background: white; color: #333; padding: 12px; border-radius: 4px; position: absolute; top: 15px; right: 15px; z-index: 1000; font-family: monospace; border: 1px solid #ccc; font-weight: bold; }
+        h2 { font-size: 18px; margin-bottom: 25px; border-bottom: 1px solid #555; padding-bottom: 10px; }
+        label { font-weight: bold; display: block; margin-bottom: 5px; font-size: 13px; color: #ddd; }
+        select, input, button { width: 100%; margin-bottom: 15px; padding: 10px; border-radius: 5px; border: 1px solid #444; font-size: 13px; font-weight: bold; box-sizing: border-box; }
+        input[type="file"].loaded { background-color: #27ae60 !important; color: white; }
+        button { background: #4b6584; color: white; border: none; cursor: pointer; text-transform: uppercase; }
+        button:hover { background: #2f3640; }
+        .stn-label-style { color: black; font-weight: 800; font-size: 12px; text-transform: uppercase; text-shadow: 1px 1px white; }
+        #violation_panel { background: #444; padding: 10px; border-radius: 5px; margin-top: 10px; display: none; }
+    </style>
+</head>
+<body>
+    <div id="sidebar">
+        <h2>SECR RAIPUR TELOC CELL</h2>
+        <label>RTIS Data:</label>
+        <input type="file" id="csv_file" accept=".csv" onchange="this.classList.add('loaded')">
+        <label>From:</label><select id="s_from"></select>
+        <label>To:</label><select id="s_to"></select>
+        <button onclick="generateLiveMap()">Generate Map</button>
+        <button style="background: #218c74;" onclick="saveInteractiveWebReport()">Web Report</button>
+        <button style="background: #2d98da;" onclick="downloadExcelAudit()">Excel Download</button>
+        
+        <div id="violation_panel">
+            <label>Verify Signal Violation:</label>
+            <select id="vio_sig_list"></select>
+            <label>Observed Speed (Kmph):</label>
+            <input type="number" step="0.1" id="vio_speed" placeholder="00.0">
+            <button style="background: #e67e22;" onclick="generateViolationReport()">Bulk Report Violation</button>
+        </div>
+    </div>
+    <div id="map"><div class="stats-box">SPD: <span id="live-speed">0.0</span> | TIME: <span id="live-time">--:--</span></div></div>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.0/papaparse.min.js"></script>
+    <script src="mapping.js"></script>
+    <script src="report.js"></script>
+</body>
+</html>
