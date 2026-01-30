@@ -1,16 +1,14 @@
 /**
- * SECR RAIPUR TELOC CELL - Report Logic
- * Includes: Web Report & Bulk Violation Audit
+ * SECR RAIPUR TELOC CELL - Optimized Report Logic
+ * Violation Audit with Dynamic Red/Green Logic based on User Target Speed
  */
 
-// Function to generate the standard Interactive Web Report
 window.saveInteractiveWebReport = function() {
     if(!window.rtis.length) return alert("Pehle Map Generate karein!");
     const sF = document.getElementById('s_from').value;
     const sT = document.getElementById('s_to').value;
     const dir = determineDirection(sF, sT);
     
-    // Filter signals encountered during this journey
     let sigData = [];
     window.master.sigs.forEach(sig => {
         if(!sig.type.startsWith(dir)) return;
@@ -19,7 +17,6 @@ window.saveInteractiveWebReport = function() {
         if(m) sigData.push({n:getVal(sig,['SIGNAL_NAME']), s:m.spd, t:m.time, lt:lt, lg:lg, clr:sig.clr});
     });
 
-    // Filter stations encountered
     let stnData = [];
     window.master.stns.forEach(s => {
         let n = getVal(s,['Station_Name']), lt = conv(getVal(s,['Start_Lat '])), lg = conv(getVal(s,['Start_Lng']));
@@ -40,7 +37,7 @@ window.saveInteractiveWebReport = function() {
         <h3>SECR RAIPUR</h3>
         <b>Journey: ${sF} &#8594; ${sT}</b><hr>
         ${sigData.map(r=>`<div class="card" style="border-left-color:${r.clr}" onclick="m.setView([${r.lt},${r.lg}],17)">
-            <div style="font-size:14px;">${r.n}</div>
+            <div style="font-size:14px; font-weight:bold;">${r.n}</div>
             <div style="font-size:12px;color:#666;">Speed: <b>${r.s} Kmph</b> | Time: ${r.t}</div>
         </div>`).join('')}
     </div>
@@ -48,30 +45,21 @@ window.saveInteractiveWebReport = function() {
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script><script>
         var m=L.map('map').setView([${sigData.length?sigData[0].lt:21.15},${sigData.length?sigData[0].lg:79.12}],14);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(m);
-        
         var rData = ${JSON.stringify(window.rtis.map(p=>({lt:p.lt, lg:p.lg, s:p.spd, t:p.time})))};
         var poly=L.polyline(rData.map(p=>[p.lt,p.lg]),{color:'black',weight:4}).addTo(m);
         m.fitBounds(poly.getBounds());
-        
-        poly.on('mousemove', function(e) {
-            let p = rData.reduce((a, b) => Math.abs(b.lt-e.latlng.lat) < Math.abs(a.lt-e.latlng.lat) ? b : a);
-            L.popup().setLatLng(e.latlng).setContent("Speed: "+p.s+" Kmph<br>Time: "+p.t).openOn(m);
-        });
-
         ${JSON.stringify(stnData)}.forEach(a => {
             L.marker([a.lt, a.lg], {icon:L.divIcon({html:'<b style="font-size:12px;color:#000;text-shadow:1px 1px white;white-space:nowrap;">'+a.n+'</b>', className:''})}).addTo(m);
         });
-
         ${JSON.stringify(sigData)}.forEach(s => {
             L.circleMarker([s.lt,s.lg], {radius:7, color:'white', fillColor:s.clr, fillOpacity:1, weight:1.5}).addTo(m).bindPopup("<b>"+s.n+"</b><br>Spd: "+s.s);
         });
     </script></body></html>`;
 
     let b = new Blob([html],{type:'text/html'}), a = document.createElement('a');
-    a.href=URL.createObjectURL(b); a.download=`Report_${sF}_to_${sT}.html`; a.click();
+    a.href=URL.createObjectURL(b); a.download=`WebReport_${sF}_${sT}.html`; a.click();
 };
 
-// Function for Bulk Report Violation (Target vs Actual Logic)
 window.generateViolationReport = function() {
     const selIdx = parseInt(document.getElementById('vio_sig_list').value);
     const targetSpeed = parseFloat(document.getElementById('vio_speed').value);
@@ -79,7 +67,6 @@ window.generateViolationReport = function() {
     if(isNaN(selIdx)) return alert("Pehle Map Generate karein!");
     if(isNaN(targetSpeed)) return alert("Please enter Permissible Target Speed!");
 
-    // Calculate 7-Signal Window (3 Behind + 1 Target + 3 Ahead)
     let start = Math.max(0, selIdx - 3);
     let end = Math.min(window.activeSigs.length - 1, selIdx + 3);
     let vioSigs = window.activeSigs.slice(start, end + 1);
@@ -96,7 +83,7 @@ window.generateViolationReport = function() {
         .card{padding:15px;margin-bottom:12px;border-radius:6px;border:1px solid #ddd;font-weight:bold; background:#fff; position:relative;}
         .status-tag { display:inline-block; padding:4px 10px; border-radius:3px; font-size:11px; margin-top:8px; text-transform:uppercase; font-weight:900; }
         
-        .violation{ border:2px solid #eb4d4b; background:#fff5f5; box-shadow:0 0 10px rgba(235,77,75,0.2); }
+        .violation{ border:2px solid #eb4d4b; background:#fff5f5; }
         .violation .status-tag { background:#eb4d4b; color:#fff; }
         
         .followed{ border:2px solid #2ecc71; background:#f0fff4; }
@@ -116,12 +103,12 @@ window.generateViolationReport = function() {
             <b>Actual Speed:</b> <span style="color:${isViolated?'#c0392b':'#27ae60'};">${targetSig.s} Kmph</span>
         </div>
         <hr>
-        <p style="font-size:12px; color:#666;">Signal sequence (Target +/- 3):</p>
         
         ${vioSigs.map(s => {
             let isTarget = (s.n === targetSig.n);
             let cardClass = "normal";
             let status = "";
+            let targetLabel = isTarget ? "<br><span style='color:#2980b9; font-size:11px;'>(TARGET SIGNAL) Target Speed: "+targetSpeed+" Kmph</span>" : "";
             
             if(isTarget) {
                 if(s.s > targetSpeed) {
@@ -133,26 +120,27 @@ window.generateViolationReport = function() {
                 }
             }
 
-            return `<div class="card ${cardClass}" onclick="m.setView([${s.lt},${s.lg}],17)">
-                <div style="font-size:15px;">${s.n}</div>
-                <div style="font-size:13px; color:#555; margin-top:4px;">RTIS Speed: <b>${s.s} Kmph</b></div>
-                <div style="font-size:11px; color:#888;">Logged at: ${s.t}</div>
-                ${status}
-            </div>`;
+            return \`<div class="card \${cardClass}" onclick="m.setView([\${s.lt},\${s.lg}],17)">
+                <div style="font-size:15px;">\${s.n}</div>
+                <div style="font-size:13px; color:#555; margin-top:4px;">RTIS Speed: <b>\${s.s} Kmph</b></div>
+                <div style="font-size:11px; color:#888;">Logged at: \${s.t}</div>
+                \${targetLabel}
+                \${status}
+            </div>\`;
         }).join('')}
     </div>
     <div id="map"></div>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script><script>
-        var m=L.map('map').setView([${targetSig.lt},${targetSig.lg}],16);
+        var m=L.map('map').setView([\${targetSig.lt},\${targetSig.lg}],16);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(m);
         
-        var rPath = ${JSON.stringify(window.rtis.map(p=>({lt:p.lt, lg:p.lg, s:p.spd, t:p.time})))};
+        var rPath = \${JSON.stringify(window.rtis.map(p=>({lt:p.lt, lg:p.lg, s:p.spd, t:p.time})))};
         L.polyline(rPath.map(p=>[p.lt,p.lg]),{color:'black',weight:3, opacity:0.4}).addTo(m);
 
-        ${JSON.stringify(vioSigs)}.forEach(s => {
-            let isTgt = (s.n === "${targetSig.n}");
+        \${JSON.stringify(vioSigs)}.forEach(s => {
+            let isTgt = (s.n === "\${targetSig.n}");
             let markerClr = s.clr;
-            if(isTgt) markerClr = ${isViolated} ? '#eb4d4b' : '#2ecc71';
+            if(isTgt) markerClr = \${isViolated} ? '#eb4d4b' : '#2ecc71';
             
             L.circleMarker([s.lt,s.lg], {
                 radius: isTgt ? 12 : 8, 
@@ -160,31 +148,24 @@ window.generateViolationReport = function() {
                 fillColor: markerClr, 
                 fillOpacity: 1, 
                 weight: 2
-            }).addTo(m).bindPopup("<b>"+s.n+"</b><br>Speed: "+s.s+" Kmph");
+            }).addTo(m).bindPopup("<b>"+s.n+"</b><br>RTIS Speed: "+s.s+" Kmph<br>Target Speed: \${targetSpeed} Kmph");
         });
     </script></body></html>`;
 
     let b = new Blob([html],{type:'text/html'}), a = document.createElement('a');
     a.href=URL.createObjectURL(b); 
-    a.download=`Violation_Audit_${targetSig.n.replace(/ /g,'_')}.html`; 
+    a.download=`Violation_Audit_\${targetSig.n.replace(/ /g,'_')}.html`; 
     a.click();
 };
 
-// Standard Excel Audit Download
 window.downloadExcelAudit = function() {
     if(!window.rtis.length) return alert("No Data Available");
-    const sF = document.getElementById('s_from').value;
-    const sT = document.getElementById('s_to').value;
-    const dir = determineDirection(sF, sT);
-    
     let csv = "Type,Signal Name,RTIS Speed,Time\n";
     window.master.sigs.forEach(sig => {
-        if(!sig.type.startsWith(dir)) return;
         let lt = conv(getVal(sig,['Lat'])), lg = conv(getVal(sig,['Lng']));
         let m = window.rtis.find(p => Math.sqrt(Math.pow(p.lt-lt,2)+Math.pow(p.lg-lg,2)) < 0.0012);
-        if(m) csv += `${sig.type},${getVal(sig,['SIGNAL_NAME'])},${m.spd},${m.time}\n`;
+        if(m) csv += \`\${sig.type},\${getVal(sig,['SIGNAL_NAME'])},\${m.spd},\${m.time}\\n\`;
     });
-    
     let b = new Blob([csv],{type:'text/csv'}), a = document.createElement('a');
-    a.href=URL.createObjectURL(b); a.download=`Audit_Data_${sF}_to_${sT}.csv`; a.click();
+    a.href=URL.createObjectURL(b); a.download="Audit_Data.csv"; a.click();
 };
