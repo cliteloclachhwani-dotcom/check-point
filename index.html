@@ -29,13 +29,13 @@
         <button style="background: #218c74;" onclick="saveInteractiveWebReport()">Web Report</button>
         <button style="background: #2d98da;" onclick="downloadExcelAudit()">Excel Download</button>
         
-        <div id="violation_panel">
-            <label>Verify Signal Violation:</label>
-            <select id="vio_sig_list"></select>
-            <label>Observed Speed (Kmph):</label>
-            <input type="number" step="0.1" id="vio_speed" placeholder="00.0">
-            <button style="background: #e67e22;" onclick="generateViolationReport()">Bulk Report Violation</button>
-        </div>
+       <div id="violation_panel">
+    <label>Verify Signal Violation:</label>
+    <select id="vio_sig_list"></select>
+    <label>Permissible Target Speed (Kmph):</label>
+    <input type="number" step="0.1" id="vio_speed" placeholder="e.g. 15.0">
+    <button style="background: #e67e22;" onclick="generateViolationReport()">Bulk Report Violation</button>
+</div>
     </div>
     <div id="map"><div class="stats-box">SPD: <span id="live-speed">0.0</span> | TIME: <span id="live-time">--:--</span></div></div>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
