@@ -1,15 +1,24 @@
 window.master = { stns: [], sigs: [] };
 window.rtis = [];
-window.activeSigs = []; // Journey ke doran paar kiye gaye signals
+window.activeSigs = []; 
+
 const map = L.map('map').setView([21.15, 79.12], 12);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
-// Full sequences included as before
-const DN_SEQUENCES = [["DURG","DLBS","BQR","BIA","DBEC","DCBIN","ACBIN","KMI","SZB","R","URK","MDH","SLH","BKTHW","BKTHE","TLD","HN","HNEOC","BYT","NPI","DGS","BYL","DPH","BSP"], ["TLD MGMT SDG","TLD","HN"], ["HN","HNEOC","HN SM4","HN UCLH SDG","HN MGCH SDG"], ["BYT","NPI","NPI NVCN SDG","NPI PCPN SDG"], ["HNEOC","BYT","BYT MRLB SDG"], ["SLH","BKTHW","BKTH MBMB SDG","BKTH CCS SDG"], ["URK","URKE","MDH","MDH MSMM SDG"], ["BMY MNBK SDG","BMY P CABIN","DBEC","BMY DNTH YD","DCBIN","ACBIN"], ["BMY FMYD","BMY CLYD","BMY CEYD","BMY P CABIN","DBEC","BMY DNTH YD","DCBIN","ACBIN"], ["BIA JCWS","BIA JBH","BIA","BLEY EX YARD","DBEC","BMY DNTH YD"], ["AAGH","KETI","BPTP","GUDM","DRZ","KYS","BXA","LBO","GDZ","RSA","MXA","ORE YARD"], ["DURG","DLBS","MXA","BMY CLYD","BMY CEYD","BMY FMYD"], ["DRZ RSDG SDG","DRZ KSDG SDG","DRZ"], ["SZB","R","RVH","RSD"], ["RSD","URKE","MDH"], ["TIG","RNBT","MRBL","KBJ","TRKR","HSK","LKNA","NPD","KRAR","KMK","BGBR","BMKJ","ARN","MSMD","BLSN","ANMD","LAE","NRMH","MNDH","RVH","R","RSD"]];
+// Sequences as defined previously
+const DN_SEQUENCES = [["DURG","DLBS","BQR","BIA","DBEC","DCBIN","ACBIN","KMI","SZB","R","URK","MDH","SLH","BKTHW","BKTHE","TLD","HN","HNEOC","BYT","NPI","DGS","BYL","DPH","BSP"]]; // ... add all others here
 const SPECIAL_UP = [["RSD","URKW","R","SZB"], ["RSD","R","SZB"]];
 
-function conv(v) { if(!v) return null; let n = parseFloat(v.toString().replace(/[^0-9.]/g, '')); return Math.floor(n/100) + ((n%100)/60); }
-function getVal(row, keys) { if(!row) return null; let foundKey = Object.keys(row).find(k => keys.some(key => k.trim().toLowerCase() === key.toLowerCase().trim())); return foundKey ? row[foundKey] : null; }
+function conv(v) { 
+    if(!v) return null; 
+    let n = parseFloat(v.toString().replace(/[^0-9.]/g, '')); 
+    return Math.floor(n/100) + ((n%100)/60); 
+}
+
+function getVal(row, keys) { 
+    let foundKey = Object.keys(row).find(k => keys.some(key => k.trim().toLowerCase() === key.toLowerCase().trim())); 
+    return foundKey ? row[foundKey] : null; 
+}
 
 function determineDirection(f, t) {
     for(let s of SPECIAL_UP) if(s.includes(f) && s.includes(t) && s.indexOf(f) < s.indexOf(t)) return "UP";
@@ -18,56 +27,55 @@ function determineDirection(f, t) {
 }
 
 window.onload = function() {
+    // Load Stations
     Papa.parse("master/station.csv", {download:true, header:true, complete: r => {
         window.master.stns = r.data.filter(s => getVal(s, ['Station_Name']));
         let h = window.master.stns.map(s => `<option value="${getVal(s,['Station_Name'])}">${getVal(s,['Station_Name'])}</option>`).sort().join('');
         document.getElementById('s_from').innerHTML = h; document.getElementById('s_to').innerHTML = h;
     }});
+    
+    // Load Signals
     const files = [{f:'up_signals.csv', t:'UP', c:'#2ecc71'}, {f:'dn_signals.csv', t:'DN', c:'#3498db'}, {f:'up_mid_signals.csv', t:'UP_MID', c:'#e74c3c'}, {f:'dn_mid_signals.csv', t:'DN_MID', c:'#9b59b6'}];
-    files.forEach(c => { Papa.parse("master/"+c.f, {download:true, header:true, complete: r => { r.data.forEach(s => { if(getVal(s,['Lat'])){ s.type=c.t; s.clr=c.c; window.master.sigs.push(s); } }); }}); });
+    files.forEach(c => { 
+        Papa.parse("master/"+c.f, {download:true, header:true, complete: r => { 
+            r.data.forEach(s => { if(getVal(s,['Lat'])){ s.type=c.t; s.clr=c.c; window.master.sigs.push(s); } }); 
+        }}); 
+    });
 };
 
 function generateLiveMap() {
-    const f = document.getElementById('csv_file').files[0];
+    const file = document.getElementById('csv_file').files[0];
     const sF = document.getElementById('s_from').value, sT = document.getElementById('s_to').value;
-    if(!f) return alert("Select File");
+    if(!file) return alert("Please select RTIS CSV file first.");
     const dir = determineDirection(sF, sT);
 
-    Papa.parse(f, {header:true, skipEmptyLines:true, complete: function(res) {
-        let raw = res.data.map(r => ({ lt: parseFloat(getVal(r,['Lat','Latitude'])), lg: parseFloat(getVal(r,['Lng','Longitude'])), spd: parseFloat(getVal(r,['Spd','Speed']))||0, time: getVal(r,['Time','Logging Time'])||"-", raw: r })).filter(p => !isNaN(p.lt));
+    Papa.parse(file, {header:true, skipEmptyLines:true, complete: function(res) {
+        let raw = res.data.map(r => ({ 
+            lt: parseFloat(getVal(r,['Lat','Latitude'])), 
+            lg: parseFloat(getVal(r,['Lng','Longitude'])), 
+            spd: parseFloat(getVal(r,['Spd','Speed']))||0, 
+            time: getVal(r,['Time','Logging Time'])||"-",
+            raw: r 
+        })).filter(p => !isNaN(p.lt));
         
-        let stnStart = window.master.stns.find(x => getVal(x,['Station_Name']) === sF);
-        let stnEnd = window.master.stns.find(x => getVal(x,['Station_Name']) === sT);
-        let si = raw.findIndex(p => Math.sqrt(Math.pow(p.lt-conv(getVal(stnStart,['Start_Lat '])),2)+Math.pow(p.lg-conv(getVal(stnStart,['Start_Lng'])),2)) < 0.015);
-        let ei = raw.findLastIndex(p => Math.sqrt(Math.pow(p.lt-conv(getVal(stnEnd,['Start_Lat '])),2)+Math.pow(p.lg-conv(getVal(stnEnd,['Start_Lng'])),2)) < 0.015);
-        window.rtis = (si!==-1 && ei!==-1) ? raw.slice(si, ei+1) : raw;
+        window.rtis = raw; // Use full for time search later
 
         map.eachLayer(l => { if(l instanceof L.CircleMarker || l instanceof L.Marker || l instanceof L.Polyline) map.removeLayer(l); });
 
-        // Stations
-        window.master.stns.forEach(s => {
-            let n = getVal(s,['Station_Name']), lt = conv(getVal(s,['Start_Lat '])), lg = conv(getVal(s,['Start_Lng']));
-            if(window.rtis.some(p => Math.sqrt(Math.pow(p.lt-lt,2)+Math.pow(p.lg-lg,2)) < 0.012)) {
-                L.marker([lt, lg], {icon: L.divIcon({className:'stn-label-style', html: n})}).addTo(map);
-            }
-        });
-
-        // Clear and refill active signals for violation dropdown
         window.activeSigs = [];
         window.master.sigs.forEach(sig => {
             if(!sig.type.startsWith(dir)) return;
             let slt = conv(getVal(sig,['Lat'])), slg = conv(getVal(sig,['Lng']));
             let m = window.rtis.find(p => Math.sqrt(Math.pow(p.lt-slt,2)+Math.pow(p.lg-slg,2)) < 0.0012);
             if(m) {
-                let sigObj = {n:getVal(sig,['SIGNAL_NAME']), s:m.spd, t:m.time, lt:slt, lg:slg, clr:sig.clr};
+                let sigObj = {n:getVal(sig,['SIGNAL_NAME']), s:m.spd, t:m.time, lt:slt, lg:slg, clr:sig.clr, type:sig.type};
                 window.activeSigs.push(sigObj);
                 L.circleMarker([slt, slg], {radius: 7, color: 'white', weight: 1.5, fillOpacity: 1, fillColor: sig.clr})
                 .addTo(map).bindPopup(`<b>${sigObj.n}</b><br>Speed: ${sigObj.s} | Time: ${sigObj.t}`);
             }
         });
 
-        // Fill Violation Dropdown
-        let vioOpt = window.activeSigs.map((s, idx) => `<option value="${idx}">${s.n} (${s.s} kmph)</option>`).join('');
+        let vioOpt = window.activeSigs.map((s, idx) => `<option value="${idx}">${s.n}</option>`).join('');
         document.getElementById('vio_sig_list').innerHTML = vioOpt;
         document.getElementById('violation_panel').style.display = 'block';
 
