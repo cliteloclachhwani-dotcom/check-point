@@ -2,7 +2,7 @@ window.master = { stns: [], sigs: [] }; window.rtis = []; window.activeSigs = []
 const map = L.map('map').setView([21.15, 79.12], 12);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
-// --- 16 DN RULES (RESTORED) ---
+// --- 16 DN RULES (DO NOT TOUCH) ---
 const DN_RULES = [
     ["DURG","DLBS","BQR","BIA","DBEC","DCBIN","ACBIN","KMI","SZB","R","URK","MDH","SLH","BKTHW","BKTHE","TLD","HN","HNEOC","BYT","NPI","DGS","BYL","DPH","BSP"],
     ["TLD MGMT SDG","TLD","HN"], ["HN","HNEOC","HN SM4","HN UCLH SDG","HN MGCH SDG"], ["BYT","NPI","NPI NVCN SDG","NPI PCPN SDG"], ["HNEOC","BYT","BYT MRLB SDG"], ["SLH","BKTHW","BKTH MBMB SDG","BKTH CCS SDG"], ["URK","URKE","MDH","MDH MSMM SDG"], ["BMY MNBK SDG","BMY P CABIN","DBEC","BMY DNTH YD","DCBIN","ACBIN"], ["BMY FMYD","BMY CLYD","BMY CEYD","BMY P CABIN","DBEC","BMY DNTH YD","DCBIN","ACBIN"], ["BIA JCWS","BIA JBH","BIA","BLEY EX YARD","DBEC","BMY DNTH YD"], ["AAGH","KETI","BPTP","GUDM","DRZ","KYS","BXA","LBO","GDZ","RSA","MXA","ORE YARD"], ["DURG","DLBS","MXA","BMY CLYD","BMY CEYD","BMY FMYD"], ["DRZ RSDG SDG","DRZ KSDG SDG","DRZ"], ["SZB","R","RVH","RSD"], ["RSD","URKE","MDH"], ["TIG","RNBT","MRBL","KBJ","TRKR","HSK","LKNA","NPD","KRAR","KMK","BGBR","BMKJ","ARN","MSMD","BLSN","ANMD","LAE","NRMH","MNDH","RVH","R","RSD"]
@@ -32,6 +32,7 @@ function generateLiveMap() {
     const sT = document.getElementById('s_to').value;
     if(!file) return alert("Select CSV!");
 
+    // Direction Logic - Master check
     let dir = "UP"; 
     for(let r of DN_RULES) {
         let iF = r.indexOf(sF), iT = r.indexOf(sT);
@@ -51,7 +52,7 @@ function generateLiveMap() {
             if (fullData[i].stn.toUpperCase() === sT.toUpperCase()) { endIdx = i; break; }
         }
 
-        // Clipping logic
+        // Clipping
         if(startIdx !== -1 && endIdx !== -1) {
             window.rtis = fullData.slice(Math.min(startIdx, endIdx), Math.max(startIdx, endIdx) + 1);
         } else {
@@ -64,14 +65,22 @@ function generateLiveMap() {
         let poly = L.polyline(pathCoords, {color:'blue', weight:5}).addTo(map);
         map.fitBounds(poly.getBounds());
 
-        // Signal Logic - Tolerance improved to 0.006 (approx 600m)
+        // Signal Discovery - Liberal Match (0.01 tolerance)
         window.master.sigs.forEach(sig => {
+            // Sirf wahi signals check karein jo selected direction ke hain
             if(sig.type !== dir) return; 
+            
             let slt = parseFloat(getVal(sig,['Lat'])), slg = parseFloat(getVal(sig,['Lng']));
-            let near = window.rtis.find(p => Math.abs(p.lt - slt) < 0.006 && Math.abs(p.lg - slg) < 0.006);
+            // Dhoondho raste mein ye signal kahan hai
+            let near = window.rtis.find(p => Math.abs(p.lt - slt) < 0.008 && Math.abs(p.lg - slg) < 0.008);
+            
             if(near) {
                 window.activeSigs.push({n:getVal(sig,['SIGNAL_NAME']), s:near.spd, t:near.time, lt:slt, lg:slg});
-                L.circleMarker([slt, slg], {radius: 7, color: (dir==='UP'?'#2ecc71':'#3498db'), fillOpacity: 1}).addTo(map);
+                L.circleMarker([slt, slg], {
+                    radius: 8, 
+                    color: (dir==='UP' ? '#2ecc71' : '#3498db'), 
+                    fillOpacity: 1
+                }).addTo(map);
             }
         });
 
