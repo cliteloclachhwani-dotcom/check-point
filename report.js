@@ -61,7 +61,7 @@ window.generateViolationReport = function() {
         <div class="card rtis"><b>3. Signal passing as per RTIS</b><br>Time: ${rtTimeStr}<br>Speed: ${rtP.spd} Kmph<br>Distance Error: ${eRTIS}m</div>
         <div style="background:${sColor};color:white;padding:15px;text-align:center;font-weight:bold;border-radius:5px;margin:20px 0;font-size:18px;">STATUS: ${status}</div>
         
-        <div style="font-size: 36px; font-weight: bold; line-height: 1.3; margin-top: 30px; border-top: 2px solid #000; padding-top: 20px;">
+        <div style="font-size: 24px; font-weight: bold; line-height: 1.3; margin-top: 30px; border-top: 2px solid #000; padding-top: 20px;">
             Date: ${document.getElementById('rep_date').value}<br>
             Loco: ${document.getElementById('rep_loco').value}<br>
             Train: ${document.getElementById('rep_train').value}<br>
