@@ -1,43 +1,58 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>SECR MONITOR - VIOLATION MODE</title>
+    <title>SECR MONITOR - FSD & S&T AUDIT</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
-        body { margin: 0; display: flex; font-family: 'Segoe UI', sans-serif; height: 100vh; background: #f0f2f5; }
-        #sidebar { width: 320px; background: #343a40; color: #ffffff; padding: 25px; box-shadow: 2px 0 10px rgba(0,0,0,0.2); z-index: 1000; overflow-y: auto; }
+        body { margin: 0; display: flex; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; height: 100vh; background: #f0f2f5; }
+        #sidebar { width: 340px; background: #2c3e50; color: #ffffff; padding: 20px; box-shadow: 2px 0 10px rgba(0,0,0,0.3); z-index: 1000; overflow-y: auto; }
         #map { flex: 1; position: relative; }
-        .stats-box { background: white; color: #333; padding: 12px; border-radius: 4px; position: absolute; top: 15px; right: 15px; z-index: 1000; font-family: monospace; border: 1px solid #ccc; font-weight: bold; }
-        h2 { font-size: 18px; margin-bottom: 25px; border-bottom: 1px solid #555; padding-bottom: 10px; }
-        label { font-weight: bold; display: block; margin-bottom: 5px; font-size: 13px; color: #ddd; }
-        select, input, button { width: 100%; margin-bottom: 15px; padding: 10px; border-radius: 5px; border: 1px solid #444; font-size: 13px; font-weight: bold; box-sizing: border-box; }
-        input[type="file"].loaded { background-color: #27ae60 !important; color: white; }
-        button { background: #4b6584; color: white; border: none; cursor: pointer; text-transform: uppercase; }
-        button:hover { background: #2f3640; }
-        .stn-label-style { color: black; font-weight: 800; font-size: 12px; text-transform: uppercase; text-shadow: 1px 1px white; }
-        #violation_panel { background: #444; padding: 10px; border-radius: 5px; margin-top: 10px; display: none; }
+        .stats-box { background: rgba(255,255,255,0.9); color: #333; padding: 10px; border-radius: 4px; position: absolute; top: 15px; right: 15px; z-index: 1000; font-family: monospace; border: 2px solid #2c3e50; font-weight: bold; }
+        h2 { font-size: 18px; margin-bottom: 20px; border-bottom: 2px solid #34495e; padding-bottom: 10px; text-align: center; color: #ecf0f1; }
+        label { font-weight: bold; display: block; margin-top: 15px; margin-bottom: 5px; font-size: 13px; color: #bdc3c7; }
+        select, input, button { width: 100%; padding: 10px; border-radius: 5px; border: 1px solid #34495e; font-size: 13px; box-sizing: border-box; }
+        input[type="file"] { background: #34495e; color: white; cursor: pointer; }
+        input[type="file"].loaded { background-color: #27ae60 !important; }
+        button { background: #3498db; color: white; border: none; cursor: pointer; margin-top: 10px; font-weight: bold; text-transform: uppercase; transition: 0.3s; }
+        button:hover { background: #2980b9; }
+        .stn-label-style { color: black; font-weight: 900; font-size: 12px; text-transform: uppercase; text-shadow: 1px 1px white; white-space: nowrap; }
+        #violation_panel { background: #34495e; padding: 15px; border-radius: 8px; margin-top: 20px; display: none; border: 1px solid #1abc9c; }
     </style>
 </head>
 <body>
     <div id="sidebar">
-        <h2>SECR RAIPUR TELOC CELL</h2>
-        <label>RTIS Data:</label>
+        <h2>SECR RAIPUR TELOC</h2>
+        <label>Step 1: RTIS CSV Data</label>
         <input type="file" id="csv_file" accept=".csv" onchange="this.classList.add('loaded')">
-        <label>From:</label><select id="s_from"></select>
-        <label>To:</label><select id="s_to"></select>
-        <button onclick="generateLiveMap()">Generate Map</button>
-        <button style="background: #218c74;" onclick="saveInteractiveWebReport()">Web Report</button>
-        <button style="background: #2d98da;" onclick="downloadExcelAudit()">Excel Download</button>
         
-       <div id="violation_panel">
-    <label>Verify Signal Violation:</label>
-    <select id="vio_sig_list"></select>
-    <label>Permissible Target Speed (Kmph):</label>
-    <input type="number" step="0.1" id="vio_speed" placeholder="e.g. 15.0">
-    <button style="background: #e67e22;" onclick="generateViolationReport()">Bulk Report Violation</button>
-</div>
+        <label>Step 2: Journey Stations</label>
+        <select id="s_from"></select>
+        <select id="s_to" style="margin-top:5px;"></select>
+        
+        <button onclick="generateLiveMap()">Generate Tracker Map</button>
+        <hr style="border: 0.5px solid #444; margin: 20px 0;">
+        
+        <button style="background: #27ae60;" onclick="saveInteractiveWebReport()">Standard Web Report</button>
+        <button style="background: #2980b9;" onclick="downloadExcelAudit()">Excel Data Download</button>
+        
+        <div id="violation_panel">
+            <h3 style="font-size:14px; margin:0; color:#1abc9c;">VIOLATION AUDIT (FSD vs S&T)</h3>
+            <label>Select Signal:</label>
+            <select id="vio_sig_list"></select>
+            
+            <label>Permissible Target Speed (Kmph):</label>
+            <input type="number" step="0.1" id="vio_speed" placeholder="e.g. 15.0">
+            
+            <label>S&T Signal Passing Time:</label>
+            <input type="text" id="vio_time" placeholder="HH:MM:SS (e.g. 10:12:58)">
+            
+            <button style="background: #e67e22;" onclick="generateViolationReport()">Generate Audit Report</button>
+        </div>
     </div>
-    <div id="map"><div class="stats-box">SPD: <span id="live-speed">0.0</span> | TIME: <span id="live-time">--:--</span></div></div>
+    <div id="map">
+        <div class="stats-box">SPD: <span id="live-speed">0.0</span> | TIME: <span id="live-time">--:--</span></div>
+    </div>
+
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.0/papaparse.min.js"></script>
     <script src="mapping.js"></script>
