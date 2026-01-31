@@ -2,93 +2,48 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SECR Raipur - Triple Location Audit System</title>
-    
+    <title>TELOC CELL BULK VIOLATION AUDIT</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
-    
     <style>
-        body { margin: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; display: flex; height: 100vh; background: #f0f2f5; }
-        
-        /* Left Control Panel */
-        #controls { width: 350px; padding: 20px; background: #2c3e50; color: white; overflow-y: auto; box-shadow: 2px 0 10px rgba(0,0,0,0.3); z-index: 1000; }
-        
-        h2 { text-align: center; border-bottom: 2px solid #3498db; padding-bottom: 10px; margin-top: 0; font-size: 20px; }
-        
-        .group { background: rgba(255,255,255,0.1); padding: 15px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid #3498db; }
-        label { display: block; margin-bottom: 5px; font-size: 13px; font-weight: bold; color: #bdc3c7; }
-        
-        select, input { width: 100%; padding: 10px; margin-bottom: 10px; border-radius: 4px; border: none; box-sizing: border-box; font-size: 14px; }
-        
-        button { width: 100%; padding: 12px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; transition: 0.3s; margin-top: 5px; }
-        .btn-map { background: #27ae60; color: white; }
-        .btn-map:hover { background: #219150; }
-        .btn-audit { background: #2980b9; color: white; margin-top: 15px; }
-        .btn-audit:hover { background: #1f6391; }
-
-        /* Map Area */
-        #map { flex: 1; height: 100%; }
-
-        /* Violation Panel Styling */
-        #violation_panel { display: none; }
-        .time-box { background: #34495e; color: #ecf0f1; border: 1px solid #5d6d7e; }
-        
-        /* Legend */
-        .legend { position: absolute; bottom: 30px; right: 30px; background: white; padding: 10px; border-radius: 5px; box-shadow: 0 0 15px rgba(0,0,0,0.2); z-index: 1000; font-size: 12px; }
-        .legend div { margin-bottom: 5px; display: flex; align-items: center; }
-        .dot { height: 12px; width: 12px; border-radius: 50%; display: inline-block; margin-right: 8px; }
+        body { margin: 0; font-family: sans-serif; display: flex; height: 100vh; }
+        #controls { width: 360px; padding: 15px; background: #2c3e50; color: white; overflow-y: auto; z-index: 1000; }
+        #map { flex: 1; }
+        .group { background: rgba(255,255,255,0.1); padding: 12px; border-radius: 6px; margin-bottom: 15px; }
+        label { display: block; font-size: 12px; color: #ccc; margin-bottom: 4px; }
+        input, select { width: 100%; padding: 8px; margin-bottom: 8px; border-radius: 4px; border: none; }
+        button { width: 100%; padding: 10px; cursor: pointer; font-weight: bold; border-radius: 4px; border: none; }
+        .btn-green { background: #27ae60; color: white; }
+        .btn-blue { background: #2980b9; color: white; margin-top: 10px; }
     </style>
 </head>
 <body>
-
 <div id="controls">
-    <h2>SECR TELOC CELL</h2>
-    
+    <h3>TELOC CELL</h3>
     <div class="group">
-        <label>1. Select RTIS CSV File</label>
-        <input type="file" id="csv_file" accept=".csv">
+        <label>RTIS CSV File</label>
+        <input type="file" id="csv_file">
+        <label>Date</label><input type="date" id="rep_date">
+        <label>Loco No.</label><input type="text" id="rep_loco">
+        <label>Train No.</label><input type="text" id="rep_train">
+        <label>LP ID</label><input type="text" id="rep_lp">
     </div>
-
     <div class="group">
-        <label>2. From Station</label>
-        <select id="s_from"></select>
-        
-        <label>3. To Station</label>
-        <select id="s_to"></select>
-        
-        <button class="btn-map" onclick="generateLiveMap()">Generate Tracker Map</button>
+        <label>From Station</label><select id="s_from"></select>
+        <label>To Station</label><select id="s_to"></select>
+        <button class="btn-green" onclick="generateLiveMap()">Generate Tracker Map</button>
     </div>
-
-    <div id="violation_panel" class="group" style="border-left-color: #e74c3c;">
-        <label>4. Select Target Signal</label>
-        <select id="vio_sig_list"></select>
-        
-        <label>Target Speed Limit (Kmph)</label>
-        <input type="number" id="vio_speed" value="30">
-
-        <label>S&T Signal Pass Time (Ground Truth)</label>
-        <input type="text" id="vio_time" class="time-box" placeholder="HH:MM:SS">
-
-        <label>RTIS Display Pass Time (Reported)</label>
-        <input type="text" id="rtis_pass_time" class="time-box" placeholder="HH:MM:SS">
-        
-        <button class="btn-audit" onclick="generateViolationReport()">Generate Triple Audit Report</button>
+    <div id="violation_panel" class="group" style="display:none;">
+        <label>Selected Signal</label><select id="vio_sig_list"></select>
+        <label>Target Speed (Manual)</label><input type="number" id="vio_speed" value="30">
+        <label>S&T Pass Time</label><input type="text" id="vio_time" placeholder="HH:MM:SS">
+        <label>RTIS Pass Time</label><input type="text" id="rtis_pass_time" placeholder="HH:MM:SS">
+        <button class="btn-blue" onclick="generateViolationReport()">Generate Audit Report</button>
     </div>
 </div>
-
 <div id="map"></div>
-
-<div class="legend">
-    <div style="font-weight:bold; margin-bottom:8px; border-bottom:1px solid #ccc;">Markers Color</div>
-    <div><span class="dot" style="background:#3498db;"></span> DN Signals</div>
-    <div><span class="dot" style="background:#2ecc71;"></span> UP Signals</div>
-    <div><span class="dot" style="background:#000;"></span> RTIS Track Path</div>
-</div>
-
 <script src="mapping.js"></script>
 <script src="report.js"></script>
-
 </body>
 </html>
