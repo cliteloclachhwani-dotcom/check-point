@@ -36,10 +36,9 @@ window.generateViolationReport = function() {
         #rmap{flex:1;}
         .card{padding:15px;margin-bottom:12px;border-radius:6px;border-left:8px solid;box-shadow:0 4px 6px rgba(0,0,0,0.1);font-size:14px;}
         .st{background:#e8f5e9;border-color:green;} .fsd{background:#f3e5f5;border-color:purple;} .rtis{background:#fffde7;border-color:#fbc02d;}
-        /* Tooltip Style Fixes */
         .leaflet-tooltip { border: none !important; box-shadow: none !important; background: transparent !important; }
-        .b-lbl { font-weight: bold !important; font-size: 20px !important; color: black; }
-        .sig-name { font-weight: bold !important; font-size: 16px !important; color: black; text-transform: uppercase; }
+        .b-lbl { font-weight: bold !important; font-size: 22px !important; color: black; }
+        .sig-name { font-weight: bold !important; font-size: 18px !important; color: black; text-transform: uppercase; }
     </style></head><body>
     <div id="side">
         <h2 style="text-align:center; color:#2c3e50; border-bottom:2px solid #3498db; padding-bottom:10px;">TELOC CELL BULK VIOLATION AUDIT</h2>
@@ -49,7 +48,7 @@ window.generateViolationReport = function() {
         <div class="card rtis"><b>3. Actual Signal passing as per RTIS</b><br>Time: ${rtTimeStr}<br>Speed: ${rtP.spd} Kmph<br>Distance Error: ${eRTIS}m</div>
         <div style="background:${sColor};color:white;padding:15px;text-align:center;font-weight:bold;border-radius:5px;margin:20px 0;font-size:18px;">STATUS: ${status}</div>
         
-        <div style="font-size: 36px; font-weight: bold; line-height: 1.3; margin-top: 30px; border-top: 2px solid #000; padding-top: 20px;">
+        <div style="font-size: 38px; font-weight: bold; line-height: 1.4; margin-top: 40px; border-top: 3px solid #000; padding-top: 25px;">
             Date: ${document.getElementById('rep_date').value}<br>
             Loco: ${document.getElementById('rep_loco').value}<br>
             Train: ${document.getElementById('rep_train').value}<br>
@@ -61,17 +60,17 @@ window.generateViolationReport = function() {
         var m=L.map('rmap').setView([${stP.lt},${stP.lg}],17); 
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(m);
 
-        // 1. S&T Marker (Signal Name BOLD on top, Speed BOLD)
-        L.circleMarker([${stP.lt},${stP.lg}],{radius:11,color:'green',fillOpacity:1}).addTo(m)
+        // S&T: Signal Name Bold aur Speed
+        L.circleMarker([${stP.lt},${stP.lg}],{radius:12,color:'green',fillOpacity:1}).addTo(m)
             .bindTooltip("<div style='text-align:center'><span class='sig-name'>${fsd.n}</span><br><br><span class='b-lbl'>${stP.spd}</span></div>",
             {permanent:true, direction:'top', offset:[0,-15]});
 
-        // 2. RTIS Marker (Speed BOLD)
+        // RTIS Speed
         L.circleMarker([${rtP.lt},${rtP.lg}],{radius:10,color:'#fbc02d',fillOpacity:1}).addTo(m)
             .bindTooltip("<span class='b-lbl'>${rtP.spd}</span>",
             {permanent:true, direction:'bottom', offset:[0,15]});
 
-        // 3. FSD Marker (Speed BOLD)
+        // FSD Speed
         L.circleMarker([${fsd.lt},${fsd.lg}],{radius:10,color:'purple',fillOpacity:1}).addTo(m)
             .bindTooltip("<span class='b-lbl'>${fsd.s}</span>",
             {permanent:true, direction:'left', offset:[-15,0]});
