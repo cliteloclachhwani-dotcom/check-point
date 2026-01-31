@@ -1,112 +1,96 @@
 /**
- * SECR RAIPUR TELOC CELL - AUDIT ENGINE
- * Fixed: Strictly 2000m tracking after signal passing point
+ * SECR RAIPUR TELOC CELL - TRIPLE LOCATION AUDIT
+ * Logic: Compare FSD, S&T Actual, and RTIS Reported locations.
  */
 
 window.generateViolationReport = function() {
     try {
         const selIdx = parseInt(document.getElementById('vio_sig_list').value);
         const targetSpeed = parseFloat(document.getElementById('vio_speed').value);
-        const manualTime = document.getElementById('vio_time').value.trim();
+        const stTime = document.getElementById('vio_time').value.trim(); // S&T Ground Truth
+        const rtisPassTime = prompt("RTIS Signal Passing Time enter karein (e.g. 10:15:20):"); // RTIS Window
 
-        if (isNaN(selIdx) || !window.activeSigs[selIdx]) {
-            return alert("Pehle Signal select karein!");
-        }
+        if (isNaN(selIdx)) return alert("Pehle Signal select karein!");
         
         let fsdSig = window.activeSigs[selIdx];
-        let actualSig = { ...fsdSig };
+        let actualSig = { ...fsdSig }; // S&T Location
+        let rtisSig = { ...fsdSig };   // RTIS Reported Location
         
-        // Find the index in RTIS where the train actually passed the signal
-        let rtisIdx = window.rtis.findIndex(p => p.time && p.time.includes(manualTime));
-
-        if (rtisIdx !== -1) {
-            actualSig.s = window.rtis[rtisIdx].spd;
-            actualSig.lt = window.rtis[rtisIdx].lt;
-            actualSig.lg = window.rtis[rtisIdx].lg;
-            actualSig.t = window.rtis[rtisIdx].time;
+        // 1. Find S&T Actual Point
+        let stIdx = window.rtis.findIndex(p => p.time && p.time.includes(stTime));
+        if (stIdx !== -1) {
+            actualSig = { ...window.rtis[stIdx], t: window.rtis[stIdx].time, s: window.rtis[stIdx].spd };
         }
 
-        // Distance Error (FSD vs S&T) calculation
-        const EarthR = 6371e3; 
-        const toRad = Math.PI/180;
-        let dLat = (actualSig.lt - fsdSig.lt) * toRad;
-        let dLon = (actualSig.lg - fsdSig.lg) * toRad;
-        let dCalc = Math.sin(dLat/2) * Math.sin(dLat/2) +
-                    Math.cos(fsdSig.lt * toRad) * Math.cos(actualSig.lt * toRad) *
-                    Math.sin(dLon/2) * Math.sin(dLon/2);
-        let distError = (2 * Math.atan2(Math.sqrt(dCalc), Math.sqrt(1-dCalc)) * EarthR).toFixed(1);
-
-        // --- DYNAMIC 2000m ANALYSIS ---
-        let isThrough = true; 
-        let analysisPoints = [];
-        let totalTrackedDist = 0;
-
+        // 2. Find RTIS Reported Point
+        let rtisIdx = window.rtis.findIndex(p => p.time && p.time.includes(rtisPassTime));
         if (rtisIdx !== -1) {
-            for (let i = rtisIdx; i < window.rtis.length; i++) {
-                if (i > rtisIdx) {
-                    // Haversine for segment distance
-                    let lat1 = window.rtis[i-1].lt * toRad, lat2 = window.rtis[i].lt * toRad;
-                    let dL = (window.rtis[i].lg - window.rtis[i-1].lg) * toRad;
-                    let seg = Math.acos(Math.sin(lat1)*Math.sin(lat2) + Math.cos(lat1)*Math.cos(lat2)*Math.cos(dL)) * EarthR;
-                    totalTrackedDist += (isNaN(seg) ? 0 : seg);
+            rtisSig = { ...window.rtis[rtisIdx], t: window.rtis[rtisIdx].time, s: window.rtis[rtisIdx].spd };
+        }
+
+        // --- Distance Calculation Function ---
+        const getDist = (lat1, lon1, lat2, lon2) => {
+            const R = 6371000; // meters
+            const dLat = (lat2 - lat1) * Math.PI/180;
+            const dLon = (lon2 - lon1) * Math.PI/180;
+            const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                      Math.cos(lat1 * Math.PI/180) * Math.cos(lat2 * Math.PI/180) *
+                      Math.sin(dLon/2) * Math.sin(dLon/2);
+            return (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)) * R).toFixed(1);
+        };
+
+        let errFSD = getDist(fsdSig.lt, fsdSig.lg, actualSig.lt, actualSig.lg);
+        let errRTIS = getDist(rtisSig.lt, rtisSig.lg, actualSig.lt, actualSig.lg);
+
+        // --- Through-Pass Logic (Still based on S&T Actual) ---
+        let isThrough = true;
+        let analysisPoints = [];
+        let totalDist = 0;
+        if (stIdx !== -1) {
+            for (let i = stIdx; i < window.rtis.length; i++) {
+                if (i > stIdx) {
+                    totalDist += parseFloat(getDist(window.rtis[i-1].lt, window.rtis[i-1].lg, window.rtis[i].lt, window.rtis[i].lg));
                 }
-                
                 analysisPoints.push([window.rtis[i].lt, window.rtis[i].lg]);
-
-                // Check speed condition
-                if (window.rtis[i].spd < 31) {
-                    isThrough = false;
-                    break;
-                }
-
-                if (totalTrackedDist >= 2000) break; // Strict 2000m stop
+                if (window.rtis[i].spd < 31) { isThrough = false; break; }
+                if (totalDist >= 2000) break;
             }
         }
 
-        let finalStatus = isThrough ? "NO VIOLATION (THROUGH PASS)" : (actualSig.s > targetSpeed ? "SPEED VIOLATION" : "RULE FOLLOWED");
-        let statusClr = isThrough ? "#95a5a6" : (actualSig.s > targetSpeed ? "#d63031" : "#27ae60");
+        let status = isThrough ? "NO VIOLATION (THROUGH PASS)" : (actualSig.s > targetSpeed ? "SPEED VIOLATION" : "RULE FOLLOWED");
+        let clr = isThrough ? "#95a5a6" : (actualSig.s > targetSpeed ? "#d63031" : "#27ae60");
 
         // --- HTML Report ---
-        let reportHtml = `<html><head><title>Audit: ${fsdSig.n}</title>
+        let html = `<html><head><title>Triple Audit: ${fsdSig.n}</title>
             <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
             <style>
                 body{display:flex;margin:0;font-family:sans-serif;height:100vh;}
-                #side{width:400px;padding:25px;background:#ffffff;border-right:1px solid #ddd;overflow-y:auto;box-shadow: 2px 0 5px rgba(0,0,0,0.1);}
+                #side{width:400px;padding:20px;background:#f8f9fa;border-right:1px solid #ddd;overflow-y:auto;}
                 #map{flex:1;}
-                .card{background:#f8f9fa;padding:15px;border-radius:8px;margin-bottom:12px;border-left:5px solid #2c3e50;}
-                .status-box{padding:20px;border-radius:8px;text-align:center;font-weight:bold;color:white;font-size:18px;background:${statusClr};}
-                .rule-box{font-size:12px; background:#eef7ff; padding:12px; border-radius:6px; margin-top:20px; border:1px solid #cfe2ff; color:#084298;}
+                .card{background:white;padding:12px;border-radius:8px;margin-bottom:10px;box-shadow:0 2px 4px rgba(0,0,0,0.05);font-size:13px;}
+                .fsd{border-left:5px solid #e67e22;} .st{border-left:5px solid #2980b9;} .rtis{border-left:5px solid #8e44ad;}
+                .status{padding:15px;border-radius:8px;text-align:center;font-weight:bold;color:white;background:${clr};}
+                .err-badge{background:#fff3cd; padding:3px 6px; border-radius:4px; font-weight:bold; color:#856404; font-size:11px;}
             </style></head><body>
             <div id="side">
-                <h3 style="margin-top:0; color:#2c3e50;">AUDIT REPORT</h3>
-                <div class="card"><b>Signal:</b> ${fsdSig.n}</div>
-                <div class="card" style="border-color:#e67e22;"><b>FSD Point:</b><br>Speed: ${fsdSig.s} Kmph | ${fsdSig.t}</div>
-                <div class="card" style="border-color:#2980b9;"><b>Actual Point:</b><br>Speed: ${actualSig.s} Kmph | ${actualSig.t}<br><b>Error: ${distError}m</b></div>
-                <div class="status-box">${finalStatus}</div>
-                <div class="rule-box">
-                    <b>Rule Applied:</b> Violation is checked only if train speed drops below <b>31 Kmph</b> within <b>2000 meters</b> after passing the signal location.
-                    <br><br><b>Distance Tracked:</b> ${totalTrackedDist.toFixed(0)} meters.
-                </div>
+                <h3>TRIPLE LOCATION AUDIT</h3>
+                <div class="card fsd"><b>[1] FSD LOCATION</b><br>Time: ${fsdSig.t}<br><span class="err-badge">Error: ${errFSD}m from S&T</span></div>
+                <div class="card st"><b>[2] S&T ACTUAL PASSING (Ground Truth)</b><br>Time: ${stTime}<br>Speed: ${actualSig.s} Kmph</div>
+                <div class="card rtis"><b>[3] RTIS REPORTED PASSING</b><br>Time: ${rtisPassTime}<br><span class="err-badge">Error: ${errRTIS}m from S&T</span></div>
+                <div class="status">${status}</div>
+                <p style="font-size:11px; color:#666; margin-top:15px;">Violation check: Valid only if speed < 31kmph within 2km after S&T passing point.</p>
             </div><div id="map"></div>
             <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
             <script>
-                var m=L.map('map').setView([${actualSig.lt},${actualSig.lg}],16);
+                var m=L.map('map').setView([${actualSig.lt},${actualSig.lg}],17);
                 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(m);
-                L.circleMarker([${fsdSig.lt},${fsdSig.lg}],{radius:7,color:'#e67e22',fillOpacity:0.8}).addTo(m).bindPopup('FSD');
-                L.circleMarker([${actualSig.lt},${actualSig.lg}],{radius:10,color:'white',fillColor:'${statusClr}',fillOpacity:1,weight:3}).addTo(m).bindPopup('Actual Passing');
-                
-                // Drawing the 2000m zone
-                var zonePath = ${JSON.stringify(analysisPoints)};
-                L.polyline(zonePath, {color: '${statusClr}', weight: 5, opacity: 0.7}).addTo(m);
+                L.circleMarker([${fsdSig.lt},${fsdSig.lg}],{radius:6,color:'#e67e22',fillOpacity:0.8}).addTo(m).bindPopup('FSD');
+                L.circleMarker([${actualSig.lt},${actualSig.lg}],{radius:10,color:'white',fillColor:'${clr}',fillOpacity:1,weight:3}).addTo(m).bindPopup('S&T Actual');
+                L.circleMarker([${rtisSig.lt},${rtisSig.lg}],{radius:8,color:'#8e44ad',fillOpacity:0.8}).addTo(m).bindPopup('RTIS Reported');
+                L.polyline(${JSON.stringify(analysisPoints)},{color:'${clr}',weight:5,opacity:0.4}).addTo(m);
             </script></body></html>`;
 
-        let blob = new Blob([reportHtml], {type:'text/html'});
-        let link = document.createElement('a');
-        link.href = URL.createObjectURL(blob);
-        link.download = "Audit_" + fsdSig.n.replace(/\s+/g, '_') + ".html";
-        link.click();
-
-    } catch (err) {
-        alert("Report Error: " + err.message);
-    }
-}
+        let b = new Blob([html], {type:'text/html'}), a = document.createElement('a');
+        a.href = URL.createObjectURL(b); a.download = "Triple_Audit_"+fsdSig.n+".html"; a.click();
+    } catch(e) { alert(e.message); }
+};
