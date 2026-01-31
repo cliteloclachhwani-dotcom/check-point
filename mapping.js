@@ -53,6 +53,7 @@ function generateLiveMap() {
         map.eachLayer(l => { if(l instanceof L.CircleMarker || l instanceof L.Polyline) map.removeLayer(l); });
         window.activeSigs = [];
         
+        // Strict Section & Direction Filtering
         window.master.sigs.forEach(sig => {
             if(sig.type !== dir) return; 
             let slt = conv(getVal(sig,['Lat'])), slg = conv(getVal(sig,['Lng']));
