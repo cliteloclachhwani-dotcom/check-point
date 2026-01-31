@@ -2,6 +2,7 @@ window.master = { stns: [], sigs: [] }; window.rtis = []; window.activeSigs = []
 const map = L.map('map').setView([21.15, 79.12], 12);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
+// Aapke 16 DN Rules ka logic
 const DN_RULES = [
     ["DURG","DLBS","BQR","BIA","DBEC","DCBIN","ACBIN","KMI","SZB","R","URK","MDH","SLH","BKTHW","BKTHE","TLD","HN","HNEOC","BYT","NPI","DGS","BYL","DPH","BSP"],
     ["TLD MGMT SDG","TLD","HN"], ["HN","HNEOC","HN SM4","HN UCLH SDG","HN MGCH SDG"], ["BYT","NPI","NPI NVCN SDG","NPI PCPN SDG"], ["HNEOC","BYT","BYT MRLB SDG"], ["SLH","BKTHW","BKTH MBMB SDG","BKTH CCS SDG"], ["URK","URKE","MDH","MDH MSMM SDG"], ["BMY MNBK SDG","BMY P CABIN","DBEC","BMY DNTH YD","DCBIN","ACBIN"], ["BMY FMYD","BMY CLYD","BMY CEYD","BMY P CABIN","DBEC","BMY DNTH YD","DCBIN","ACBIN"], ["BIA JCWS","BIA JBH","BIA","BLEY EX YARD","DBEC","BMY DNTH YD"], ["AAGH","KETI","BPTP","GUDM","DRZ","KYS","BXA","LBO","GDZ","RSA","MXA","ORE YARD"], ["DURG","DLBS","MXA","BMY CLYD","BMY CEYD","BMY FMYD"], ["DRZ RSDG SDG","DRZ KSDG SDG","DRZ"], ["SZB","R","RVH","RSD"], ["RSD","URKE","MDH"], ["TIG","RNBT","MRBL","KBJ","TRKR","HSK","LKNA","NPD","KRAR","KMK","BGBR","BMKJ","ARN","MSMD","BLSN","ANMD","LAE","NRMH","MNDH","RVH","R","RSD"]
@@ -45,6 +46,7 @@ function generateLiveMap() {
     }
 
     Papa.parse(file, {header:true, skipEmptyLines:true, complete: function(res) {
+        // Sirf wahi RTIS data jo path me hai
         window.rtis = res.data.map(r => ({
             lt: parseFloat(getVal(r,['Lat','Latitude'])), lg: parseFloat(getVal(r,['Lng','Longitude'])), 
             spd: parseFloat(getVal(r,['Spd','Speed']))||0, time: getVal(r,['Time','Logging Time'])
@@ -53,7 +55,7 @@ function generateLiveMap() {
         map.eachLayer(l => { if(l instanceof L.CircleMarker || l instanceof L.Polyline) map.removeLayer(l); });
         window.activeSigs = [];
         
-        // Strict Signal Filtering
+        // Strict Filtering: Wahi signals jo RTIS path aur Direction ke saath match karein
         window.master.sigs.forEach(sig => {
             if(sig.type !== dir) return; 
             let slt = conv(getVal(sig,['Lat'])), slg = conv(getVal(sig,['Lng']));
@@ -67,7 +69,7 @@ function generateLiveMap() {
         document.getElementById('vio_sig_list').innerHTML = window.activeSigs.map((s,i)=>`<option value="${i}">${s.n}</option>`).join('');
         document.getElementById('violation_panel').style.display='block';
         let pathCoords = window.rtis.map(p=>[p.lt,p.lg]);
-        L.polyline(pathCoords, {color:'black', weight:2}).addTo(map);
+        L.polyline(pathCoords, {color:'blue', weight:4}).addTo(map); // Screenshot 1017 ke hisab se blue thick line
         map.fitBounds(L.polyline(pathCoords).getBounds());
     }});
 }
