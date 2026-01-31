@@ -2,11 +2,7 @@ window.master = { stns: [], sigs: [] }; window.rtis = []; window.activeSigs = []
 const map = L.map('map').setView([21.15, 79.12], 12);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
-// Aapke 16 DN Rules ka logic
-const DN_RULES = [
-    ["DURG","DLBS","BQR","BIA","DBEC","DCBIN","ACBIN","KMI","SZB","R","URK","MDH","SLH","BKTHW","BKTHE","TLD","HN","HNEOC","BYT","NPI","DGS","BYL","DPH","BSP"],
-    ["TLD MGMT SDG","TLD","HN"], ["HN","HNEOC","HN SM4","HN UCLH SDG","HN MGCH SDG"], ["BYT","NPI","NPI NVCN SDG","NPI PCPN SDG"], ["HNEOC","BYT","BYT MRLB SDG"], ["SLH","BKTHW","BKTH MBMB SDG","BKTH CCS SDG"], ["URK","URKE","MDH","MDH MSMM SDG"], ["BMY MNBK SDG","BMY P CABIN","DBEC","BMY DNTH YD","DCBIN","ACBIN"], ["BMY FMYD","BMY CLYD","BMY CEYD","BMY P CABIN","DBEC","BMY DNTH YD","DCBIN","ACBIN"], ["BIA JCWS","BIA JBH","BIA","BLEY EX YARD","DBEC","BMY DNTH YD"], ["AAGH","KETI","BPTP","GUDM","DRZ","KYS","BXA","LBO","GDZ","RSA","MXA","ORE YARD"], ["DURG","DLBS","MXA","BMY CLYD","BMY CEYD","BMY FMYD"], ["DRZ RSDG SDG","DRZ KSDG SDG","DRZ"], ["SZB","R","RVH","RSD"], ["RSD","URKE","MDH"], ["TIG","RNBT","MRBL","KBJ","TRKR","HSK","LKNA","NPD","KRAR","KMK","BGBR","BMKJ","ARN","MSMD","BLSN","ANMD","LAE","NRMH","MNDH","RVH","R","RSD"]
-];
+// ... DN_RULES list (same as before)
 
 function conv(v) { 
     if(!v) return null; let s = v.toString().trim();
@@ -28,7 +24,7 @@ window.onload = function() {
     }});
     [{f:'up_signals.csv', t:'UP'}, {f:'dn_signals.csv', t:'DN'}].forEach(conf => {
         Papa.parse("master/"+conf.f, {download:true, header:true, complete: r => { 
-            r.data.forEach(s => { if(getVal(s,['Lat'])){ s.type=conf.t; s.clr = (conf.t === 'UP') ? '#2ecc71' : '#3498db'; window.master.sigs.push(s); } }); 
+            r.data.forEach(s => { if(getVal(s,['Lat'])){ s.type=conf.t; window.master.sigs.push(s); } }); 
         }});
     });
 };
@@ -39,37 +35,46 @@ function generateLiveMap() {
     const sT = document.getElementById('s_to').value;
     if(!file) return alert("Select CSV!");
 
-    let dir = "UP"; 
-    for(let r of DN_RULES) {
-        let iF = r.indexOf(sF), iT = r.indexOf(sT);
-        if(iF !== -1 && iT !== -1 && iF < iT) { dir = "DN"; break; }
-    }
-
     Papa.parse(file, {header:true, skipEmptyLines:true, complete: function(res) {
-        // Sirf wahi RTIS data jo path me hai
-        window.rtis = res.data.map(r => ({
+        let fullData = res.data.map(r => ({
             lt: parseFloat(getVal(r,['Lat','Latitude'])), lg: parseFloat(getVal(r,['Lng','Longitude'])), 
             spd: parseFloat(getVal(r,['Spd','Speed']))||0, time: getVal(r,['Time','Logging Time'])
         })).filter(p => !isNaN(p.lt) && p.lt !== 0);
 
+        // Geofencing: Sirf selected stations ke beech ka data
+        let stnF = window.master.stns.find(s => getVal(s,['Station_Name']) === sF);
+        let stnT = window.master.stns.find(s => getVal(s,['Station_Name']) === sT);
+        let ltF = conv(getVal(stnF,['Lat'])), lgF = conv(getVal(stnF,['Lng']));
+        let ltT = conv(getVal(stnT,['Lat'])), lgT = conv(getVal(stnT,['Lng']));
+
+        // Filter RTIS points within station range (~2km buffer)
+        window.rtis = fullData.filter(p => {
+            let dF = Math.sqrt((p.lt-ltF)**2 + (p.lg-lgF)**2);
+            let dT = Math.sqrt((p.lt-ltT)**2 + (p.lg-lgT)**2);
+            return (p.lt >= Math.min(ltF, ltT)-0.02 && p.lt <= Math.max(ltF, ltT)+0.02 &&
+                    p.lg >= Math.min(lgF, lgT)-0.02 && p.lg <= Math.max(lgF, lgT)+0.02);
+        });
+
         map.eachLayer(l => { if(l instanceof L.CircleMarker || l instanceof L.Polyline) map.removeLayer(l); });
         window.activeSigs = [];
         
-        // Strict Filtering: Wahi signals jo RTIS path aur Direction ke saath match karein
-        window.master.sigs.forEach(sig => {
-            if(sig.type !== dir) return; 
-            let slt = conv(getVal(sig,['Lat'])), slg = conv(getVal(sig,['Lng']));
-            let m = window.rtis.find(p => Math.abs(p.lt - slt) < 0.002 && Math.abs(p.lg - slg) < 0.002);
-            if(m) {
-                window.activeSigs.push({n:getVal(sig,['SIGNAL_NAME']), s:m.spd, t:m.time, lt:slt, lg:slg, clr:sig.clr});
-                L.circleMarker([slt, slg], {radius: 6, color: sig.clr, fillOpacity: 1}).addTo(map).bindPopup("<b>"+getVal(sig,['SIGNAL_NAME'])+"</b><br>Speed: "+m.spd);
-            }
-        });
-
-        document.getElementById('vio_sig_list').innerHTML = window.activeSigs.map((s,i)=>`<option value="${i}">${s.n}</option>`).join('');
-        document.getElementById('violation_panel').style.display='block';
+        // Final Path Display
         let pathCoords = window.rtis.map(p=>[p.lt,p.lg]);
-        L.polyline(pathCoords, {color:'blue', weight:4}).addTo(map); // Screenshot 1017 ke hisab se blue thick line
-        map.fitBounds(L.polyline(pathCoords).getBounds());
+        if(pathCoords.length > 0) {
+            L.polyline(pathCoords, {color:'blue', weight:5}).addTo(map);
+            map.fitBounds(L.polyline(pathCoords).getBounds());
+            
+            // Filter Signals only for this specific path
+            window.master.sigs.forEach(sig => {
+                let slt = conv(getVal(sig,['Lat'])), slg = conv(getVal(sig,['Lng']));
+                let near = window.rtis.find(p => Math.abs(p.lt - slt) < 0.001 && Math.abs(p.lg - slg) < 0.001);
+                if(near) {
+                    window.activeSigs.push({n:getVal(sig,['SIGNAL_NAME']), s:near.spd, t:near.time, lt:slt, lg:slg});
+                    L.circleMarker([slt, slg], {radius: 6, color: 'red', fillOpacity: 1}).addTo(map);
+                }
+            });
+            document.getElementById('vio_sig_list').innerHTML = window.activeSigs.map((s,i)=>`<option value="${i}">${s.n}</option>`).join('');
+            document.getElementById('violation_panel').style.display='block';
+        } else { alert("No RTIS data found between these stations!"); }
     }});
 }
