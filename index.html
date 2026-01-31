@@ -1,61 +1,94 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>SECR MONITOR - FSD & S&T AUDIT</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SECR Raipur - Triple Location Audit System</title>
+    
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
+    
     <style>
-        body { margin: 0; display: flex; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; height: 100vh; background: #f0f2f5; }
-        #sidebar { width: 340px; background: #2c3e50; color: #ffffff; padding: 20px; box-shadow: 2px 0 10px rgba(0,0,0,0.3); z-index: 1000; overflow-y: auto; }
-        #map { flex: 1; position: relative; }
-        .stats-box { background: rgba(255,255,255,0.9); color: #333; padding: 10px; border-radius: 4px; position: absolute; top: 15px; right: 15px; z-index: 1000; font-family: monospace; border: 2px solid #2c3e50; font-weight: bold; }
-        h2 { font-size: 18px; margin-bottom: 20px; border-bottom: 2px solid #34495e; padding-bottom: 10px; text-align: center; color: #ecf0f1; }
-        label { font-weight: bold; display: block; margin-top: 15px; margin-bottom: 5px; font-size: 13px; color: #bdc3c7; }
-        select, input, button { width: 100%; padding: 10px; border-radius: 5px; border: 1px solid #34495e; font-size: 13px; box-sizing: border-box; }
-        input[type="file"] { background: #34495e; color: white; cursor: pointer; }
-        input[type="file"].loaded { background-color: #27ae60 !important; }
-        button { background: #3498db; color: white; border: none; cursor: pointer; margin-top: 10px; font-weight: bold; text-transform: uppercase; transition: 0.3s; }
-        button:hover { background: #2980b9; }
-        .stn-label-style { color: black; font-weight: 900; font-size: 12px; text-transform: uppercase; text-shadow: 1px 1px white; white-space: nowrap; }
-        #violation_panel { background: #34495e; padding: 15px; border-radius: 8px; margin-top: 20px; display: none; border: 1px solid #1abc9c; }
+        body { margin: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; display: flex; height: 100vh; background: #f0f2f5; }
+        
+        /* Left Control Panel */
+        #controls { width: 350px; padding: 20px; background: #2c3e50; color: white; overflow-y: auto; box-shadow: 2px 0 10px rgba(0,0,0,0.3); z-index: 1000; }
+        
+        h2 { text-align: center; border-bottom: 2px solid #3498db; padding-bottom: 10px; margin-top: 0; font-size: 20px; }
+        
+        .group { background: rgba(255,255,255,0.1); padding: 15px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid #3498db; }
+        label { display: block; margin-bottom: 5px; font-size: 13px; font-weight: bold; color: #bdc3c7; }
+        
+        select, input { width: 100%; padding: 10px; margin-bottom: 10px; border-radius: 4px; border: none; box-sizing: border-box; font-size: 14px; }
+        
+        button { width: 100%; padding: 12px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; transition: 0.3s; margin-top: 5px; }
+        .btn-map { background: #27ae60; color: white; }
+        .btn-map:hover { background: #219150; }
+        .btn-audit { background: #2980b9; color: white; margin-top: 15px; }
+        .btn-audit:hover { background: #1f6391; }
+
+        /* Map Area */
+        #map { flex: 1; height: 100%; }
+
+        /* Violation Panel Styling */
+        #violation_panel { display: none; }
+        .time-box { background: #34495e; color: #ecf0f1; border: 1px solid #5d6d7e; }
+        
+        /* Legend */
+        .legend { position: absolute; bottom: 30px; right: 30px; background: white; padding: 10px; border-radius: 5px; box-shadow: 0 0 15px rgba(0,0,0,0.2); z-index: 1000; font-size: 12px; }
+        .legend div { margin-bottom: 5px; display: flex; align-items: center; }
+        .dot { height: 12px; width: 12px; border-radius: 50%; display: inline-block; margin-right: 8px; }
     </style>
 </head>
 <body>
-    <div id="sidebar">
-        <h2>SECR RAIPUR TELOC</h2>
-        <label>Step 1: RTIS CSV Data</label>
-        <input type="file" id="csv_file" accept=".csv" onchange="this.classList.add('loaded')">
-        
-        <label>Step 2: Journey Stations</label>
-        <select id="s_from"></select>
-        <select id="s_to" style="margin-top:5px;"></select>
-        
-        <button onclick="generateLiveMap()">Generate Tracker Map</button>
-        <hr style="border: 0.5px solid #444; margin: 20px 0;">
-        
-        <button style="background: #27ae60;" onclick="saveInteractiveWebReport()">Standard Web Report</button>
-        <button style="background: #2980b9;" onclick="downloadExcelAudit()">Excel Data Download</button>
-        
-        <div id="violation_panel">
-            <h3 style="font-size:14px; margin:0; color:#1abc9c;">VIOLATION AUDIT (FSD vs S&T)</h3>
-            <label>Select Signal:</label>
-            <select id="vio_sig_list"></select>
-            
-            <label>Permissible Target Speed (Kmph):</label>
-            <input type="number" step="0.1" id="vio_speed" placeholder="e.g. 15.0">
-            
-            <label>S&T Signal Passing Time:</label>
-            <input type="text" id="vio_time" placeholder="HH:MM:SS (e.g. 10:12:58)">
-            
-            <button style="background: #e67e22;" onclick="generateViolationReport()">Generate Audit Report</button>
-        </div>
-    </div>
-    <div id="map">
-        <div class="stats-box">SPD: <span id="live-speed">0.0</span> | TIME: <span id="live-time">--:--</span></div>
+
+<div id="controls">
+    <h2>SECR TELOC CELL</h2>
+    
+    <div class="group">
+        <label>1. Select RTIS CSV File</label>
+        <input type="file" id="csv_file" accept=".csv">
     </div>
 
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.0/papaparse.min.js"></script>
-    <script src="mapping.js"></script>
-    <script src="report.js"></script>
+    <div class="group">
+        <label>2. From Station</label>
+        <select id="s_from"></select>
+        
+        <label>3. To Station</label>
+        <select id="s_to"></select>
+        
+        <button class="btn-map" onclick="generateLiveMap()">Generate Tracker Map</button>
+    </div>
+
+    <div id="violation_panel" class="group" style="border-left-color: #e74c3c;">
+        <label>4. Select Target Signal</label>
+        <select id="vio_sig_list"></select>
+        
+        <label>Target Speed Limit (Kmph)</label>
+        <input type="number" id="vio_speed" value="30">
+
+        <label>S&T Signal Pass Time (Ground Truth)</label>
+        <input type="text" id="vio_time" class="time-box" placeholder="HH:MM:SS">
+
+        <label>RTIS Display Pass Time (Reported)</label>
+        <input type="text" id="rtis_pass_time" class="time-box" placeholder="HH:MM:SS">
+        
+        <button class="btn-audit" onclick="generateViolationReport()">Generate Triple Audit Report</button>
+    </div>
+</div>
+
+<div id="map"></div>
+
+<div class="legend">
+    <div style="font-weight:bold; margin-bottom:8px; border-bottom:1px solid #ccc;">Markers Color</div>
+    <div><span class="dot" style="background:#3498db;"></span> DN Signals</div>
+    <div><span class="dot" style="background:#2ecc71;"></span> UP Signals</div>
+    <div><span class="dot" style="background:#000;"></span> RTIS Track Path</div>
+</div>
+
+<script src="mapping.js"></script>
+<script src="report.js"></script>
+
 </body>
 </html>
