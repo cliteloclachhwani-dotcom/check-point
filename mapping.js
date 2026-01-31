@@ -4,26 +4,11 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
 const DN_RULES = [
     ["DURG","DLBS","BQR","BIA","DBEC","DCBIN","ACBIN","KMI","SZB","R","URK","MDH","SLH","BKTHW","BKTHE","TLD","HN","HNEOC","BYT","NPI","DGS","BYL","DPH","BSP"],
-    ["TLD MGMT SDG","TLD","HN"],
-    ["HN","HNEOC","HN SM4","HN UCLH SDG","HN MGCH SDG"],
-    ["BYT","NPI","NPI NVCN SDG","NPI PCPN SDG"],
-    ["HNEOC","BYT","BYT MRLB SDG"],
-    ["SLH","BKTHW","BKTH MBMB SDG","BKTH CCS SDG"],
-    ["URK","URKE","MDH","MDH MSMM SDG"],
-    ["BMY MNBK SDG","BMY P CABIN","DBEC","BMY DNTH YD","DCBIN","ACBIN"],
-    ["BMY FMYD","BMY CLYD","BMY CEYD","BMY P CABIN","DBEC","BMY DNTH YD","DCBIN","ACBIN"],
-    ["BIA JCWS","BIA JBH","BIA","BLEY EX YARD","DBEC","BMY DNTH YD"],
-    ["AAGH","KETI","BPTP","GUDM","DRZ","KYS","BXA","LBO","GDZ","RSA","MXA","ORE YARD"],
-    ["DURG","DLBS","MXA","BMY CLYD","BMY CEYD","BMY FMYD"],
-    ["DRZ RSDG SDG","DRZ KSDG SDG","DRZ"],
-    ["SZB","R","RVH","RSD"],
-    ["RSD","URKE","MDH"],
-    ["TIG","RNBT","MRBL","KBJ","TRKR","HSK","LKNA","NPD","KRAR","KMK","BGBR","BMKJ","ARN","MSMD","BLSN","ANMD","LAE","NRMH","MNDH","RVH","R","RSD"]
+    ["TLD MGMT SDG","TLD","HN"], ["HN","HNEOC","HN SM4","HN UCLH SDG","HN MGCH SDG"], ["BYT","NPI","NPI NVCN SDG","NPI PCPN SDG"], ["HNEOC","BYT","BYT MRLB SDG"], ["SLH","BKTHW","BKTH MBMB SDG","BKTH CCS SDG"], ["URK","URKE","MDH","MDH MSMM SDG"], ["BMY MNBK SDG","BMY P CABIN","DBEC","BMY DNTH YD","DCBIN","ACBIN"], ["BMY FMYD","BMY CLYD","BMY CEYD","BMY P CABIN","DBEC","BMY DNTH YD","DCBIN","ACBIN"], ["BIA JCWS","BIA JBH","BIA","BLEY EX YARD","DBEC","BMY DNTH YD"], ["AAGH","KETI","BPTP","GUDM","DRZ","KYS","BXA","LBO","GDZ","RSA","MXA","ORE YARD"], ["DURG","DLBS","MXA","BMY CLYD","BMY CEYD","BMY FMYD"], ["DRZ RSDG SDG","DRZ KSDG SDG","DRZ"], ["SZB","R","RVH","RSD"], ["RSD","URKE","MDH"], ["TIG","RNBT","MRBL","KBJ","TRKR","HSK","LKNA","NPD","KRAR","KMK","BGBR","BMKJ","ARN","MSMD","BLSN","ANMD","LAE","NRMH","MNDH","RVH","R","RSD"]
 ];
 
 function conv(v) { 
-    if(!v) return null; 
-    let s = v.toString().trim();
+    if(!v) return null; let s = v.toString().trim();
     let n = parseFloat(s.replace(/[^0-9.]/g, '')); 
     if(s.includes('.') && s.split('.')[0].length <= 2) return n; 
     return Math.floor(n/100) + ((n%100)/60); 
@@ -61,20 +46,15 @@ function generateLiveMap() {
 
     Papa.parse(file, {header:true, skipEmptyLines:true, complete: function(res) {
         window.rtis = res.data.map(r => ({
-            lt: parseFloat(getVal(r,['Lat','Latitude'])), 
-            lg: parseFloat(getVal(r,['Lng','Longitude'])), 
-            spd: parseFloat(getVal(r,['Spd','Speed']))||0, 
-            time: getVal(r,['Time','Logging Time'])
+            lt: parseFloat(getVal(r,['Lat','Latitude'])), lg: parseFloat(getVal(r,['Lng','Longitude'])), 
+            spd: parseFloat(getVal(r,['Spd','Speed']))||0, time: getVal(r,['Time','Logging Time'])
         })).filter(p => !isNaN(p.lt) && p.lt !== 0);
 
         map.eachLayer(l => { if(l instanceof L.CircleMarker || l instanceof L.Polyline) map.removeLayer(l); });
         window.activeSigs = [];
         
-        // Strictly Section & Direction Wise Filtering
         window.master.sigs.forEach(sig => {
-            if(sig.type !== dir) return; // Direction check
-            let sName = getVal(sig, ['SECTION', 'Section_Name']);
-            // Agar signal ke data mein section hai, toh current selected section se match hona chahiye
+            if(sig.type !== dir) return; 
             let slt = conv(getVal(sig,['Lat'])), slg = conv(getVal(sig,['Lng']));
             let m = window.rtis.find(p => Math.abs(p.lt - slt) < 0.002 && Math.abs(p.lg - slg) < 0.002);
             if(m) {
