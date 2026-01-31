@@ -58,7 +58,7 @@ window.generateViolationReport = function() {
         <p><b>Signal Audited:</b> <span style="color:#2980b9;">${fsd.n}</span></p>
         <div class="card st"><b>1. Actual Signal passing as per S&T</b><br>Time: ${stTimeStr}<br>Speed: ${stP.spd} Kmph<br>Distance Error: 0</div>
         <div class="card fsd"><b>2. Signal passing as per FSD</b><br>Time: ${fsd.t}<br>Speed: ${fsd.s} Kmph<br>Distance Error: ${eFSD}m</div>
-        <div class="card rtis"><b>3. Actual Signal passing as per RTIS</b><br>Time: ${rtTimeStr}<br>Speed: ${rtP.spd} Kmph<br>Distance Error: ${eRTIS}m</div>
+        <div class="card rtis"><b>3. Signal passing as per RTIS</b><br>Time: ${rtTimeStr}<br>Speed: ${rtP.spd} Kmph<br>Distance Error: ${eRTIS}m</div>
         <div style="background:${sColor};color:white;padding:15px;text-align:center;font-weight:bold;border-radius:5px;margin:20px 0;font-size:18px;">STATUS: ${status}</div>
         
         <div style="font-size: 36px; font-weight: bold; line-height: 1.3; margin-top: 30px; border-top: 2px solid #000; padding-top: 20px;">
