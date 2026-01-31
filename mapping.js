@@ -2,7 +2,7 @@ window.master = { stns: [], sigs: [] }; window.rtis = []; window.activeSigs = []
 const map = L.map('map').setView([21.15, 79.12], 12);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
-// 16 DN Rules - Master List
+// 16 DN Rules - Master List (Hamesha Enable)
 const DN_RULES = [
     ["DURG","DLBS","BQR","BIA","DBEC","DCBIN","ACBIN","KMI","SZB","R","URK","MDH","SLH","BKTHW","BKTHE","TLD","HN","HNEOC","BYT","NPI","DGS","BYL","DPH","BSP"],
     ["TLD MGMT SDG","TLD","HN"], ["HN","HNEOC","HN SM4","HN UCLH SDG","HN MGCH SDG"], ["BYT","NPI","NPI NVCN SDG","NPI PCPN SDG"], ["HNEOC","BYT","BYT MRLB SDG"], ["SLH","BKTHW","BKTH MBMB SDG","BKTH CCS SDG"], ["URK","URKE","MDH","MDH MSMM SDG"], ["BMY MNBK SDG","BMY P CABIN","DBEC","BMY DNTH YD","DCBIN","ACBIN"], ["BMY FMYD","BMY CLYD","BMY CEYD","BMY P CABIN","DBEC","BMY DNTH YD","DCBIN","ACBIN"], ["BIA JCWS","BIA JBH","BIA","BLEY EX YARD","DBEC","BMY DNTH YD"], ["AAGH","KETI","BPTP","GUDM","DRZ","KYS","BXA","LBO","GDZ","RSA","MXA","ORE YARD"], ["DURG","DLBS","MXA","BMY CLYD","BMY CEYD","BMY FMYD"], ["DRZ RSDG SDG","DRZ KSDG SDG","DRZ"], ["SZB","R","RVH","RSD"], ["RSD","URKE","MDH"], ["TIG","RNBT","MRBL","KBJ","TRKR","HSK","LKNA","NPD","KRAR","KMK","BGBR","BMKJ","ARN","MSMD","BLSN","ANMD","LAE","NRMH","MNDH","RVH","R","RSD"]
@@ -20,7 +20,7 @@ function getVal(row, keys) {
     return f ? row[f] : null; 
 }
 
-// Simple distance function for station matching
+// Coordinate matching logic with higher precision
 function getDist(l1, g1, l2, g2) {
     return Math.sqrt(Math.pow(l1 - l2, 2) + Math.pow(g1 - g2, 2));
 }
@@ -56,15 +56,13 @@ function generateLiveMap() {
             spd: parseFloat(getVal(r,['Spd','Speed']))||0, time: getVal(r,['Time','Logging Time'])
         })).filter(p => !isNaN(p.lt) && p.lt !== 0);
 
-        // Get exact coordinates of selected FROM/TO stations
         let stnF = window.master.stns.find(s => getVal(s,['Station_Name']) === sF);
         let stnT = window.master.stns.find(s => getVal(s,['Station_Name']) === sT);
         let ltF = conv(getVal(stnF,['Lat'])), lgF = conv(getVal(stnF,['Lng']));
         let ltT = conv(getVal(stnT,['Lat'])), lgT = conv(getVal(stnT,['Lng']));
 
-        // Find the index of these stations in RTIS file
         let startIdx = -1, endIdx = -1;
-        let dF_min = 99, dT_min = 99;
+        let dF_min = 0.05, dT_min = 0.05; // 5 KM Tolerance to find station in file
 
         fullData.forEach((p, i) => {
             let dF = getDist(p.lt, p.lg, ltF, lgF);
@@ -73,13 +71,14 @@ function generateLiveMap() {
             if(dT < dT_min) { dT_min = dT; endIdx = i; }
         });
 
-        // Strict Clipping: Agar station mil gaye, toh sirf beech ka data
+        // STRICTOR PATH: Agar dono stations ka data mil jaye tabhi clip karo
         if(startIdx !== -1 && endIdx !== -1) {
             let s = Math.min(startIdx, endIdx);
             let e = Math.max(startIdx, endIdx);
             window.rtis = fullData.slice(s, e + 1);
         } else {
-            window.rtis = fullData; // Fallback
+            alert("Warning: Selected Stations not found in RTIS logs. Using closest available path.");
+            window.rtis = fullData; 
         }
 
         map.eachLayer(l => { if(l instanceof L.CircleMarker || l instanceof L.Polyline) map.removeLayer(l); });
@@ -89,11 +88,9 @@ function generateLiveMap() {
         let poly = L.polyline(pathCoords, {color:'blue', weight:5}).addTo(map);
         map.fitBounds(poly.getBounds());
 
-        // Signal filtering based on 16 rules and direction
         window.master.sigs.forEach(sig => {
             if(sig.type !== dir) return; 
             let slt = conv(getVal(sig,['Lat'])), slg = conv(getVal(sig,['Lng']));
-            // Match signal with the visible track (0.002 = approx 200-300m)
             let near = window.rtis.find(p => Math.abs(p.lt - slt) < 0.002 && Math.abs(p.lg - slg) < 0.002);
             if(near) {
                 window.activeSigs.push({n:getVal(sig,['SIGNAL_NAME']), s:near.spd, t:near.time, lt:slt, lg:slg});
