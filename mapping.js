@@ -2,7 +2,7 @@ window.master = { stns: [], sigs: [] }; window.rtis = []; window.activeSigs = []
 const map = L.map('map').setView([21.15, 79.12], 12);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
-// Aapke wahi 16 Rules jinhe hamesha enable rakhna hai
+// 16 DN Rules - Hamesha Enable
 const DN_RULES = [
     ["DURG","DLBS","BQR","BIA","DBEC","DCBIN","ACBIN","KMI","SZB","R","URK","MDH","SLH","BKTHW","BKTHE","TLD","HN","HNEOC","BYT","NPI","DGS","BYL","DPH","BSP"],
     ["TLD MGMT SDG","TLD","HN"], ["HN","HNEOC","HN SM4","HN UCLH SDG","HN MGCH SDG"], ["BYT","NPI","NPI NVCN SDG","NPI PCPN SDG"], ["HNEOC","BYT","BYT MRLB SDG"], ["SLH","BKTHW","BKTH MBMB SDG","BKTH CCS SDG"], ["URK","URKE","MDH","MDH MSMM SDG"], ["BMY MNBK SDG","BMY P CABIN","DBEC","BMY DNTH YD","DCBIN","ACBIN"], ["BMY FMYD","BMY CLYD","BMY CEYD","BMY P CABIN","DBEC","BMY DNTH YD","DCBIN","ACBIN"], ["BIA JCWS","BIA JBH","BIA","BLEY EX YARD","DBEC","BMY DNTH YD"], ["AAGH","KETI","BPTP","GUDM","DRZ","KYS","BXA","LBO","GDZ","RSA","MXA","ORE YARD"], ["DURG","DLBS","MXA","BMY CLYD","BMY CEYD","BMY FMYD"], ["DRZ RSDG SDG","DRZ KSDG SDG","DRZ"], ["SZB","R","RVH","RSD"], ["RSD","URKE","MDH"], ["TIG","RNBT","MRBL","KBJ","TRKR","HSK","LKNA","NPD","KRAR","KMK","BGBR","BMKJ","ARN","MSMD","BLSN","ANMD","LAE","NRMH","MNDH","RVH","R","RSD"]
@@ -20,8 +20,9 @@ function getVal(row, keys) {
     return f ? row[f] : null; 
 }
 
-function getDist(lat1, lon1, lat2, lon2) {
-    return Math.sqrt(Math.pow(lat1 - lat2, 2) + Math.pow(lon1 - lon2, 2));
+// Distance Helper for cropping
+function getDist(l1, g1, l2, g2) {
+    return Math.sqrt(Math.pow(l1 - l2, 2) + Math.pow(g1 - g2, 2));
 }
 
 window.onload = function() {
@@ -43,7 +44,7 @@ function generateLiveMap() {
     const sT = document.getElementById('s_to').value;
     if(!file) return alert("Select CSV!");
 
-    // Direction Logic using DN_RULES
+    // Direction logic based on DN_RULES
     let dir = "UP"; 
     for(let r of DN_RULES) {
         let iF = r.indexOf(sF), iT = r.indexOf(sT);
@@ -56,15 +57,15 @@ function generateLiveMap() {
             spd: parseFloat(getVal(r,['Spd','Speed']))||0, time: getVal(r,['Time','Logging Time'])
         })).filter(p => !isNaN(p.lt) && p.lt !== 0);
 
-        // Find Station coordinates for cropping
+        // Crop logic with tolerance
         let stnF = window.master.stns.find(s => getVal(s,['Station_Name']) === sF);
         let stnT = window.master.stns.find(s => getVal(s,['Station_Name']) === sT);
         let ltF = conv(getVal(stnF,['Lat'])), lgF = conv(getVal(stnF,['Lng']));
         let ltT = conv(getVal(stnT,['Lat'])), lgT = conv(getVal(stnT,['Lng']));
 
-        // Find Indices for "Same Result" issue
         let startIdx = -1, endIdx = -1;
-        let dF_min = 999, dT_min = 999;
+        let dF_min = 99, dT_min = 99;
+
         fullData.forEach((p, i) => {
             let dF = getDist(p.lt, p.lg, ltF, lgF);
             let dT = getDist(p.lt, p.lg, ltT, lgT);
@@ -72,10 +73,15 @@ function generateLiveMap() {
             if(dT < dT_min) { dT_min = dT; endIdx = i; }
         });
 
-        // Crop data strictly between stations
-        let s = Math.min(startIdx, endIdx);
-        let e = Math.max(startIdx, endIdx);
-        window.rtis = fullData.slice(s, e + 1);
+        // Agar station 5km ke radius mein bhi na mile toh error (Preventing total failure)
+        if(dF_min > 0.05 || dT_min > 0.05) {
+            alert("No RTIS points found near selected stations. Using full data.");
+            window.rtis = fullData;
+        } else {
+            let s = Math.min(startIdx, endIdx);
+            let e = Math.max(startIdx, endIdx);
+            window.rtis = fullData.slice(s, e + 1);
+        }
 
         map.eachLayer(l => { if(l instanceof L.CircleMarker || l instanceof L.Polyline) map.removeLayer(l); });
         window.activeSigs = [];
@@ -84,14 +90,15 @@ function generateLiveMap() {
         L.polyline(pathCoords, {color:'blue', weight:5}).addTo(map);
         map.fitBounds(L.polyline(pathCoords).getBounds());
 
-        // Signal Filtering based on BOTH Path and Direction Rule
+        // Signal filtering
         window.master.sigs.forEach(sig => {
             if(sig.type !== dir) return; 
             let slt = conv(getVal(sig,['Lat'])), slg = conv(getVal(sig,['Lng']));
-            let near = window.rtis.find(p => Math.abs(p.lt - slt) < 0.0015 && Math.abs(p.lg - slg) < 0.0015);
+            let near = window.rtis.find(p => Math.abs(p.lt - slt) < 0.002 && Math.abs(p.lg - slg) < 0.002);
             if(near) {
                 window.activeSigs.push({n:getVal(sig,['SIGNAL_NAME']), s:near.spd, t:near.time, lt:slt, lg:slg});
-                L.circleMarker([slt, slg], {radius: 6, color: (sig.type==='UP'?'#2ecc71':'#3498db'), fillOpacity: 1}).addTo(map);
+                let clr = (sig.type==='UP'?'#2ecc71':'#3498db');
+                L.circleMarker([slt, slg], {radius: 6, color: clr, fillOpacity: 1}).addTo(map);
             }
         });
 
