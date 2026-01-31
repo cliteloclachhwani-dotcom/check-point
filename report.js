@@ -36,6 +36,7 @@ window.generateViolationReport = function() {
         #rmap{flex:1;}
         .card{padding:15px;margin-bottom:12px;border-radius:6px;border-left:8px solid;box-shadow:0 4px 6px rgba(0,0,0,0.1);font-size:14px;}
         .st{background:#e8f5e9;border-color:green;} .fsd{background:#f3e5f5;border-color:purple;} .rtis{background:#fffde7;border-color:#fbc02d;}
+        /* Tooltip Style Fixes */
         .leaflet-tooltip { border: none !important; box-shadow: none !important; background: transparent !important; }
         .b-lbl { font-weight: bold !important; font-size: 20px !important; color: black; }
         .sig-name { font-weight: bold !important; font-size: 16px !important; color: black; text-transform: uppercase; }
@@ -47,6 +48,7 @@ window.generateViolationReport = function() {
         <div class="card fsd"><b>2. Signal passing as per FSD</b><br>Time: ${fsd.t}<br>Speed: ${fsd.s} Kmph<br>Distance Error: ${eFSD}m</div>
         <div class="card rtis"><b>3. Actual Signal passing as per RTIS</b><br>Time: ${rtTimeStr}<br>Speed: ${rtP.spd} Kmph<br>Distance Error: ${eRTIS}m</div>
         <div style="background:${sColor};color:white;padding:15px;text-align:center;font-weight:bold;border-radius:5px;margin:20px 0;font-size:18px;">STATUS: ${status}</div>
+        
         <div style="font-size: 36px; font-weight: bold; line-height: 1.3; margin-top: 30px; border-top: 2px solid #000; padding-top: 20px;">
             Date: ${document.getElementById('rep_date').value}<br>
             Loco: ${document.getElementById('rep_loco').value}<br>
@@ -59,14 +61,17 @@ window.generateViolationReport = function() {
         var m=L.map('rmap').setView([${stP.lt},${stP.lg}],17); 
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(m);
 
+        // 1. S&T Marker (Signal Name BOLD on top, Speed BOLD)
         L.circleMarker([${stP.lt},${stP.lg}],{radius:11,color:'green',fillOpacity:1}).addTo(m)
             .bindTooltip("<div style='text-align:center'><span class='sig-name'>${fsd.n}</span><br><br><span class='b-lbl'>${stP.spd}</span></div>",
             {permanent:true, direction:'top', offset:[0,-15]});
 
+        // 2. RTIS Marker (Speed BOLD)
         L.circleMarker([${rtP.lt},${rtP.lg}],{radius:10,color:'#fbc02d',fillOpacity:1}).addTo(m)
             .bindTooltip("<span class='b-lbl'>${rtP.spd}</span>",
             {permanent:true, direction:'bottom', offset:[0,15]});
 
+        // 3. FSD Marker (Speed BOLD)
         L.circleMarker([${fsd.lt},${fsd.lg}],{radius:10,color:'purple',fillOpacity:1}).addTo(m)
             .bindTooltip("<span class='b-lbl'>${fsd.s}</span>",
             {permanent:true, direction:'left', offset:[-15,0]});
