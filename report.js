@@ -16,7 +16,7 @@ window.generateViolationReport = function() {
     };
 
     let eFSD = getD(fsd.lt, fsd.lg, stP.lt, stP.lg);
-    let eRTIS = getD(rtP.lt, rtP.lg, stP.lt, stP.lg);
+    let eRTIS = getD(rtP.lt, rtP.lg, stP.lt, fsd.lg);
 
     let isT = true; let dSum = 0; let stIdx = window.rtis.indexOf(stP);
     if(stIdx !== -1) {
@@ -37,6 +37,8 @@ window.generateViolationReport = function() {
         #rmap{flex:1;}
         .card{padding:15px;margin-bottom:12px;border-radius:6px;border-left:8px solid;box-shadow:0 4px 6px rgba(0,0,0,0.1);font-size:14px;}
         .st{background:#e8f5e9;border-color:green;} .fsd{background:#f3e5f5;border-color:purple;} .rtis{background:#fffde7;border-color:#fbc02d;}
+        /* Tooltip Style Fixes */
+        .leaflet-tooltip { font-weight: bold !important; font-size: 14px !important; border: none !important; box-shadow: none !important; }
     </style></head><body>
     <div id="side">
         <h2 style="text-align:center; color:#2c3e50; border-bottom:2px solid #3498db; padding-bottom:10px;">TELOC CELL BULK VIOLATION AUDIT</h2>
@@ -47,16 +49,28 @@ window.generateViolationReport = function() {
         <div style="background:${sColor};color:white;padding:15px;text-align:center;font-weight:bold;border-radius:5px;margin:20px 0;font-size:18px;">STATUS: ${status}</div>
         <div style="font-size:12px; border-top:1px solid #ddd; padding-top:15px; color:#555;">
             <i>Rule: Violation checked only if train speed drops below 31 Kmph within 2km of Signal passing.</i><br><br>
-            <b>Date:</b> ${document.getElementById('rep_date').value} | <b>Loco:</b> ${document.getElementById('rep_loco').value}<br>
-            <b>Train:</b> ${document.getElementById('rep_train').value} | <b>LP ID:</b> ${document.getElementById('rep_lp').value}
+            <div style="font-size: 36px; font-weight: bold; color: black; line-height: 1.2;">
+            Date: ${document.getElementById('rep_date').value}<br>
+            Loco: ${document.getElementById('rep_loco').value}<br>
+            Train: ${document.getElementById('rep_train').value}<br>
+            LP ID: ${document.getElementById('rep_lp').value}
+            </div>
         </div>
     </div><div id="rmap"></div>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
         var m=L.map('rmap').setView([${stP.lt},${stP.lg}],17); L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(m);
-        L.circleMarker([${stP.lt},${stP.lg}],{radius:11,color:'green',fillOpacity:1}).addTo(m).bindTooltip("S&T: ${stP.spd}",{permanent:true,direction:'top'});
-        L.circleMarker([${rtP.lt},${rtP.lg}],{radius:10,color:'#fbc02d',fillOpacity:1}).addTo(m).bindTooltip("RTIS: ${rtP.spd}",{permanent:true,direction:'bottom'});
-        L.circleMarker([${fsd.lt},${fsd.lg}],{radius:10,color:'purple',fillOpacity:1}).addTo(m).bindTooltip("FSD: ${fsd.s}",{permanent:true,direction:'left'});
+        // S&T with Signal Name Bold on Top
+        L.circleMarker([${stP.lt},${stP.lg}],{radius:11,color:'green',fillOpacity:1}).addTo(m)
+            .bindTooltip("<div style='text-align:center'><b>${fsd.n}</b><br><br><span style='font-size:20px'>${stP.spd}</span></div>",{permanent:true,direction:'top', offset:[0,-10]});
+        
+        // RTIS (No line, Bold Number)
+        L.circleMarker([${rtP.lt},${rtP.lg}],{radius:10,color:'#fbc02d',fillOpacity:1}).addTo(m)
+            .bindTooltip("<b style='font-size:20px'>${rtP.spd}</b>",{permanent:true,direction:'bottom', offset:[0,10]});
+        
+        // FSD (No line, Bold Number)
+        L.circleMarker([${fsd.lt},${fsd.lg}],{radius:10,color:'purple',fillOpacity:1}).addTo(m)
+            .bindTooltip("<b style='font-size:20px'>${fsd.s}</b>",{permanent:true,direction:'left', offset:[-10,0]});
     </script></body></html>`;
 
     let b = new Blob([h],{type:'text/html'});
