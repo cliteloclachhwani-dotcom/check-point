@@ -1,88 +1,98 @@
-/**
- * SECR RAIPUR TELOC CELL - TRIPLE AUDIT REPORT
- */
-
 window.generateViolationReport = function() {
-    try {
-        const selIdx = parseInt(document.getElementById('vio_sig_list').value);
-        const targetSpeed = parseFloat(document.getElementById('vio_speed').value);
-        const stTime = document.getElementById('vio_time').value.trim(); 
-        const rtisPassTime = document.getElementById('rtis_pass_time').value.trim(); 
+    const selIdx = document.getElementById('vio_sig_list').value;
+    const targetSpeed = document.getElementById('vio_speed').value;
+    const stT = document.getElementById('vio_time').value;
+    const rtT = document.getElementById('rtis_pass_time').value;
+    
+    const fsd = window.activeSigs[selIdx];
+    const stP = window.rtis.find(p => p.time.includes(stT)) || fsd;
+    const rtP = window.rtis.find(p => p.time.includes(rtT)) || fsd;
 
-        if (isNaN(selIdx)) return alert("Select Signal!");
-        if (!stTime || !rtisPassTime) return alert("S&T aur RTIS dono time dalein!");
+    const getD = (l1,g1,l2,g2) => {
+        const R=6371000; const dL=(l2-l1)*Math.PI/180; const dG=(g2-g1)*Math.PI/180;
+        const a=Math.sin(dL/2)**2 + Math.cos(l1*Math.PI/180)*Math.cos(l2*Math.PI/180)*Math.sin(dG/2)**2;
+        return (2*Math.atan2(Math.sqrt(a), Math.sqrt(1-a))*R).toFixed(1);
+    };
+
+    let eFSD = getD(fsd.lt, fsd.lg, stP.lt, stP.lg);
+    let eRTIS = getD(rtP.lt, rtP.lg, stP.lt, stP.lg);
+
+    // Through-pass logic
+    let isT = true; let dSum = 0; let stIdx = window.rtis.indexOf(stP);
+    for(let i=stIdx; i<window.rtis.length; i++){
+        if(i>stIdx) dSum += parseFloat(getD(window.rtis[i-1].lt,window.rtis[i-1].lg,window.rtis[i].lt,window.rtis[i].lg));
+        if(window.rtis[i].spd < 31) { isT=false; break; }
+        if(dSum > 2000) break;
+    }
+
+    let status = isT ? "THROUGH PASS" : (stP.spd > targetSpeed ? "SPEED VIOLATION" : "NORMAL");
+    let statusColor = isT ? "#7f8c8d" : (stP.spd > targetSpeed ? "#e74c3c" : "#27ae60");
+
+    let html = `<html><head><title>Audit_${fsd.n}</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        body { font-family: sans-serif; display: flex; margin: 0; height: 100vh; }
+        #sidebar { width: 420px; padding: 25px; background: #fff; border-right: 2px solid #ddd; overflow-y: auto; }
+        #rmap { flex: 1; height: 100%; }
+        .header { background: #2c3e50; color: white; padding: 15px; border-radius: 5px; text-align: center; margin-bottom: 20px; }
+        .card { padding: 12px; margin-bottom: 12px; border-radius: 6px; border-left: 6px solid; font-size: 14px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .st { background: #e8f5e9; border-color: green; }
+        .fsd { background: #f3e5f5; border-color: purple; }
+        .rtis { background: #fffde7; border-color: #fbc02d; }
+        .status-box { background: ${statusColor}; color: white; padding: 15px; text-align: center; font-weight: bold; font-size: 18px; border-radius: 5px; margin: 20px 0; }
+        .meta-table { width: 100%; font-size: 12px; border-collapse: collapse; margin-top: 15px; }
+        .meta-table td { padding: 5px; border-bottom: 1px solid #eee; }
+    </style></head><body>
+    <div id="sidebar">
+        <div class="header">TELOC CELL BULK VIOLATION AUDIT</div>
+        <p><b>Signal Audited:</b> <span style="color:#2980b9">${fsd.n}</span></p>
         
-        let fsdSig = window.activeSigs[selIdx];
-        let actualSig = { ...fsdSig }; 
-        let rtisSig = { ...fsdSig };   
+        <div class="card st">
+            <b>1. Actual Signal passing as per S&T (Benchmark)</b><br>
+            Time: ${stT} | Speed: <b>${stP.spd} Kmph</b><br>Distance Error: 0m
+        </div>
         
-        const getDist = (lat1, lon1, lat2, lon2) => {
-            const R = 6371000;
-            const dLat = (lat2 - lat1) * Math.PI/180;
-            const dLon = (lon2 - lon1) * Math.PI/180;
-            const a = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.cos(lat1 * Math.PI/180) * Math.cos(lat2 * Math.PI/180) * Math.sin(dLon/2) * Math.sin(dLon/2);
-            return (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)) * R).toFixed(1);
-        };
+        <div class="card fsd">
+            <b>2. Signal passing as per FSD</b><br>
+            Time: ${fsd.t} | Speed: <b>${fsd.s} Kmph</b><br>Distance Error: <b>${eFSD}m</b>
+        </div>
+        
+        <div class="card rtis">
+            <b>3. Actual Signal passing as per RTIS</b><br>
+            Time: ${rtT} | Speed: <b>${rtP.spd} Kmph</b><br>Distance Error: <b>${eRTIS}m</b>
+        </div>
 
-        let stIdx = window.rtis.findIndex(p => p.time && p.time.includes(stTime));
-        let rtisIdx = window.rtis.findIndex(p => p.time && p.time.includes(rtisPassTime));
+        <div class="status-box">${status}</div>
 
-        if (stIdx === -1 || rtisIdx === -1) return alert("Entered time RTIS file mein nahi mila!");
+        <table class="meta-table">
+            <tr><td><b>Date:</b> ${document.getElementById('rep_date').value}</td><td><b>Loco No:</b> ${document.getElementById('rep_loco').value}</td></tr>
+            <tr><td><b>Train No:</b> ${document.getElementById('rep_train').value}</td><td><b>LP ID:</b> ${document.getElementById('rep_lp').value}</td></tr>
+        </table>
+        <p style="font-size: 11px; color: #666; font-style: italic; margin-top: 20px;">
+            *Rule: Violation checked only if train speed drops below 31 Kmph within 2000 meters after passing the signal.
+        </p>
+    </div>
+    <div id="rmap"></div>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        var m=L.map('rmap').setView([${stP.lt},${stP.lg}], 17);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(m);
+        
+        var sBall = L.circleMarker([${stP.lt},${stP.lg}], {radius: 12, color: 'green', fillOpacity: 0.9}).addTo(m)
+                     .bindTooltip("S&T: ${stP.spd} Kmph", {permanent: true, direction: 'top'});
+        
+        var rBall = L.circleMarker([${rtP.lt},${rtP.lg}], {radius: 10, color: '#fbc02d', fillOpacity: 0.9}).addTo(m)
+                     .bindTooltip("RTIS: ${rtP.spd} Kmph", {permanent: true, direction: 'bottom'});
+        
+        var fBall = L.circleMarker([${fsd.lt},${fsd.lg}], {radius: 10, color: 'purple', fillOpacity: 0.9}).addTo(m)
+                     .bindTooltip("FSD: ${fsd.s} Kmph", {permanent: true, direction: 'left'});
 
-        actualSig = { ...window.rtis[stIdx], t: window.rtis[stIdx].time, s: window.rtis[stIdx].spd };
-        rtisSig = { ...window.rtis[rtisIdx], t: window.rtis[rtisIdx].time, s: window.rtis[rtisIdx].spd };
+        L.polyline([[${stP.lt},${stP.lg}], [${rtP.lt},${rtP.lg}]], {color: 'black', dashArray: '5,10', weight: 1}).addTo(m);
+        L.polyline([[${stP.lt},${stP.lg}], [${fsd.lt},${fsd.lg}]], {color: 'black', dashArray: '5,10', weight: 1}).addTo(m);
+    </script></body></html>`;
 
-        let errFSD = getDist(fsdSig.lt, fsdSig.lg, actualSig.lt, actualSig.lg);
-        let errRTIS = getDist(rtisSig.lt, rtisSig.lg, actualSig.lt, actualSig.lg);
-
-        // --- 2km Logic (Starting from S&T Point) ---
-        let isThrough = true;
-        let analysisPoints = [];
-        let totalDist = 0;
-        for (let i = stIdx; i < window.rtis.length; i++) {
-            if (i > stIdx) {
-                totalDist += parseFloat(getDist(window.rtis[i-1].lt, window.rtis[i-1].lg, window.rtis[i].lt, window.rtis[i].lg));
-            }
-            analysisPoints.push([window.rtis[i].lt, window.rtis[i].lg]);
-            if (window.rtis[i].spd < 31) { isThrough = false; break; }
-            if (totalDist >= 2000) break;
-        }
-
-        let status = isThrough ? "NO VIOLATION (THROUGH PASS)" : (actualSig.s > targetSpeed ? "SPEED VIOLATION" : "RULE FOLLOWED");
-        let clr = isThrough ? "#95a5a6" : (actualSig.s > targetSpeed ? "#d63031" : "#27ae60");
-
-        let html = `<html><head><title>Audit: ${fsdSig.n}</title>
-            <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
-            <style>
-                body{display:flex;margin:0;font-family:sans-serif;height:100vh;}
-                #side{width:400px;padding:20px;background:#f8f9fa;border-right:1px solid #ddd;overflow-y:auto;}
-                #map{flex:1;}
-                .card{background:white;padding:12px;border-radius:8px;margin-bottom:10px;box-shadow:0 2px 4px rgba(0,0,0,0.05);border-left:5px solid;}
-                .fsd{border-color:#e67e22;} .st{border-color:#2980b9;} .rtis{border-color:#8e44ad;}
-                .status{padding:15px;border-radius:8px;text-align:center;font-weight:bold;color:white;background:${clr};}
-                .err-badge{background:#fff3cd; padding:2px 5px; border-radius:4px; font-weight:bold; color:#856404; font-size:11px;}
-            </style></head><body>
-            <div id="side">
-                <h3 style="color:#2c3e50;">TRIPLE LOCATION AUDIT</h3>
-                <div class="card fsd"><b>[1] FSD LOCATION (Database)</b><br>Time: ${fsdSig.t}<br><span class="err-badge">Error: ${errFSD}m from S&T</span></div>
-                <div class="card st"><b>[2] S&T ACTUAL PASSING (Truth)</b><br>Time: ${stTime}<br>Speed: ${actualSig.s} Kmph</div>
-                <div class="card rtis"><b>[3] RTIS REPORTED PASSING</b><br>Time: ${rtisPassTime}<br><span class="err-badge">Error: ${errRTIS}m from S&T</span></div>
-                <div class="status">${status}</div>
-                <p style="font-size:11px; margin-top:15px; background:#eef; padding:10px; border-radius:5px;">
-                    <b>Rule:</b> Violation checked if speed < 31kmph within 2000m after S&T passing point.
-                </p>
-            </div><div id="map"></div>
-            <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-            <script>
-                var m=L.map('map').setView([${actualSig.lt},${actualSig.lg}],17);
-                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(m);
-                L.circleMarker([${fsdSig.lt},${fsdSig.lg}],{radius:6,color:'#e67e22',fillOpacity:0.8}).addTo(m).bindPopup('FSD');
-                L.circleMarker([${actualSig.lt},${actualSig.lg}],{radius:10,color:'white',fillColor:'${clr}',fillOpacity:1,weight:3}).addTo(m).bindPopup('S&T Actual');
-                L.circleMarker([${rtisSig.lt},${rtisSig.lg}],{radius:8,color:'#8e44ad',fillOpacity:0.8}).addTo(m).bindPopup('RTIS Reported');
-                L.polyline(${JSON.stringify(analysisPoints)},{color:'${clr}',weight:6,opacity:0.5}).addTo(m);
-            </script></body></html>`;
-
-        let b = new Blob([html], {type:'text/html'}), a = document.createElement('a');
-        a.href = URL.createObjectURL(b); a.download = "Audit_"+fsdSig.n+".html"; a.click();
-    } catch(e) { alert("Error: " + e.message); }
+    let blob = new Blob([html], {type:'text/html'});
+    let link = document.createElement('a'); link.href = URL.createObjectURL(blob); 
+    link.download = "Audit_" + fsd.n + "_" + document.getElementById('rep_loco').value + ".html"; 
+    link.click();
 };
