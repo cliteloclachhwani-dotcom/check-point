@@ -1,80 +1,175 @@
-window.master = { stns: [], sigs: [] }; window.rtis = []; window.activeSigs = [];
+window.master = { stns: [], sigs: [] };
+window.rtis = [];
+window.activeSigs = [];
+
+/* ================= MAP INIT ================= */
 const map = L.map('map').setView([21.15, 79.12], 12);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
-// ... DN_RULES list (same as before)
-
-function conv(v) { 
-    if(!v) return null; let s = v.toString().trim();
-    let n = parseFloat(s.replace(/[^0-9.]/g, '')); 
-    if(s.includes('.') && s.split('.')[0].length <= 2) return n; 
-    return Math.floor(n/100) + ((n%100)/60); 
+/* ================= HELPERS ================= */
+function conv(v) {
+    if (!v) return null;
+    let s = v.toString().trim();
+    let n = parseFloat(s.replace(/[^0-9.]/g, ''));
+    if (s.includes('.') && s.split('.')[0].length <= 2) return n;
+    return Math.floor(n / 100) + ((n % 100) / 60);
 }
 
-function getVal(row, keys) { 
-    let f = Object.keys(row).find(k => keys.some(key => k.trim().toLowerCase() === key.toLowerCase().trim())); 
-    return f ? row[f] : null; 
+function getVal(row, keys) {
+    let f = Object.keys(row).find(k =>
+        keys.some(key => k.trim().toLowerCase() === key.toLowerCase().trim())
+    );
+    return f ? row[f] : null;
 }
 
-window.onload = function() {
-    Papa.parse("master/station.csv", {download:true, header:true, complete: r => {
-        window.master.stns = r.data.filter(s => getVal(s, ['Station_Name']));
-        let h = window.master.stns.map(s => `<option value="${getVal(s,['Station_Name'])}">${getVal(s,['Station_Name'])}</option>`).sort().join('');
-        document.getElementById('s_from').innerHTML = h; document.getElementById('s_to').innerHTML = h;
-    }});
-    [{f:'up_signals.csv', t:'UP'}, {f:'dn_signals.csv', t:'DN'}].forEach(conf => {
-        Papa.parse("master/"+conf.f, {download:true, header:true, complete: r => { 
-            r.data.forEach(s => { if(getVal(s,['Lat'])){ s.type=conf.t; window.master.sigs.push(s); } }); 
-        }});
+function nearestIndex(arr, lt, lg) {
+    let min = Infinity, idx = -1;
+    arr.forEach((p, i) => {
+        let d = Math.hypot(p.lt - lt, p.lg - lg);
+        if (d < min) { min = d; idx = i; }
     });
+    return idx;
+}
+
+/* ================= LOAD MASTER ================= */
+window.onload = function () {
+
+    // Stations
+    Papa.parse("master/station.csv", {
+        download: true,
+        header: true,
+        complete: r => {
+            window.master.stns = r.data.filter(s => getVal(s, ['Station_Name']));
+            let opts = window.master.stns
+                .map(s => {
+                    let n = getVal(s, ['Station_Name']);
+                    return `<option value="${n}">${n}</option>`;
+                })
+                .sort()
+                .join('');
+            document.getElementById('s_from').innerHTML = opts;
+            document.getElementById('s_to').innerHTML = opts;
+        }
+    });
+
+    // Signals
+    [{ f: 'up_signals.csv', t: 'UP' }, { f: 'dn_signals.csv', t: 'DN' }]
+        .forEach(conf => {
+            Papa.parse("master/" + conf.f, {
+                download: true,
+                header: true,
+                complete: r => {
+                    r.data.forEach(s => {
+                        if (getVal(s, ['Lat'])) {
+                            s.type = conf.t;
+                            window.master.sigs.push(s);
+                        }
+                    });
+                }
+            });
+        });
 };
 
+/* ================= MAIN MAP LOGIC ================= */
 function generateLiveMap() {
+
     const file = document.getElementById('csv_file').files[0];
     const sF = document.getElementById('s_from').value;
     const sT = document.getElementById('s_to').value;
-    if(!file) return alert("Select CSV!");
 
-    Papa.parse(file, {header:true, skipEmptyLines:true, complete: function(res) {
-        let fullData = res.data.map(r => ({
-            lt: parseFloat(getVal(r,['Lat','Latitude'])), lg: parseFloat(getVal(r,['Lng','Longitude'])), 
-            spd: parseFloat(getVal(r,['Spd','Speed']))||0, time: getVal(r,['Time','Logging Time'])
-        })).filter(p => !isNaN(p.lt) && p.lt !== 0);
+    if (!file) return alert("Select CSV!");
 
-        // Geofencing: Sirf selected stations ke beech ka data
-        let stnF = window.master.stns.find(s => getVal(s,['Station_Name']) === sF);
-        let stnT = window.master.stns.find(s => getVal(s,['Station_Name']) === sT);
-        let ltF = conv(getVal(stnF,['Lat'])), lgF = conv(getVal(stnF,['Lng']));
-        let ltT = conv(getVal(stnT,['Lat'])), lgT = conv(getVal(stnT,['Lng']));
+    Papa.parse(file, {
+        header: true,
+        skipEmptyLines: true,
+        complete: function (res) {
 
-        // Filter RTIS points within station range (~2km buffer)
-        window.rtis = fullData.filter(p => {
-            let dF = Math.sqrt((p.lt-ltF)**2 + (p.lg-lgF)**2);
-            let dT = Math.sqrt((p.lt-ltT)**2 + (p.lg-lgT)**2);
-            return (p.lt >= Math.min(ltF, ltT)-0.02 && p.lt <= Math.max(ltF, ltT)+0.02 &&
-                    p.lg >= Math.min(lgF, lgT)-0.02 && p.lg <= Math.max(lgF, lgT)+0.02);
-        });
+            /* ---- RTIS CLEAN DATA ---- */
+            let fullData = res.data.map(r => ({
+                lt: parseFloat(getVal(r, ['Lat', 'Latitude'])),
+                lg: parseFloat(getVal(r, ['Lng', 'Longitude'])),
+                spd: parseFloat(getVal(r, ['Spd', 'Speed'])) || 0,
+                time: getVal(r, ['Time', 'Logging Time'])
+            })).filter(p => !isNaN(p.lt) && p.lt !== 0 && p.time);
 
-        map.eachLayer(l => { if(l instanceof L.CircleMarker || l instanceof L.Polyline) map.removeLayer(l); });
-        window.activeSigs = [];
-        
-        // Final Path Display
-        let pathCoords = window.rtis.map(p=>[p.lt,p.lg]);
-        if(pathCoords.length > 0) {
-            L.polyline(pathCoords, {color:'blue', weight:5}).addTo(map);
-            map.fitBounds(L.polyline(pathCoords).getBounds());
-            
-            // Filter Signals only for this specific path
+            if (fullData.length === 0)
+                return alert("No valid RTIS data!");
+
+            // Sort by time (VERY IMPORTANT)
+            fullData.sort((a, b) => a.time.localeCompare(b.time));
+
+            /* ---- FROM / TO STATIONS ---- */
+            let stnF = window.master.stns.find(s => getVal(s, ['Station_Name']) === sF);
+            let stnT = window.master.stns.find(s => getVal(s, ['Station_Name']) === sT);
+
+            if (!stnF || !stnT)
+                return alert("Invalid FROM / TO station!");
+
+            let ltF = conv(getVal(stnF, ['Lat']));
+            let lgF = conv(getVal(stnF, ['Lng']));
+            let ltT = conv(getVal(stnT, ['Lat']));
+            let lgT = conv(getVal(stnT, ['Lng']));
+
+            /* ---- REAL FROM–TO SLICE ---- */
+            let iFrom = nearestIndex(fullData, ltF, lgF);
+            let iTo = nearestIndex(fullData, ltT, lgT);
+
+            if (iFrom === -1 || iTo === -1)
+                return alert("RTIS data not found near selected stations!");
+
+            if (iFrom > iTo) [iFrom, iTo] = [iTo, iFrom];
+
+            window.rtis = fullData.slice(iFrom, iTo + 1);
+
+            if (window.rtis.length === 0)
+                return alert("No RTIS data between selected stations!");
+
+            /* ---- CLEAR MAP ---- */
+            map.eachLayer(l => {
+                if (l instanceof L.CircleMarker || l instanceof L.Polyline)
+                    map.removeLayer(l);
+            });
+
+            window.activeSigs = [];
+
+            /* ---- DRAW PATH ---- */
+            let pathCoords = window.rtis.map(p => [p.lt, p.lg]);
+            let poly = L.polyline(pathCoords, { color: 'blue', weight: 5 }).addTo(map);
+            map.fitBounds(poly.getBounds());
+
+            /* ---- FILTER SIGNALS ON THIS PATH ---- */
             window.master.sigs.forEach(sig => {
-                let slt = conv(getVal(sig,['Lat'])), slg = conv(getVal(sig,['Lng']));
-                let near = window.rtis.find(p => Math.abs(p.lt - slt) < 0.001 && Math.abs(p.lg - slg) < 0.001);
-                if(near) {
-                    window.activeSigs.push({n:getVal(sig,['SIGNAL_NAME']), s:near.spd, t:near.time, lt:slt, lg:slg});
-                    L.circleMarker([slt, slg], {radius: 6, color: 'red', fillOpacity: 1}).addTo(map);
+                let slt = conv(getVal(sig, ['Lat']));
+                let slg = conv(getVal(sig, ['Lng']));
+
+                let near = window.rtis.find(p =>
+                    Math.hypot(p.lt - slt, p.lg - slg) < 0.0008
+                );
+
+                if (near) {
+                    window.activeSigs.push({
+                        n: getVal(sig, ['SIGNAL_NAME']),
+                        s: near.spd,
+                        t: near.time,
+                        lt: slt,
+                        lg: slg
+                    });
+
+                    L.circleMarker([slt, slg], {
+                        radius: 6,
+                        color: 'red',
+                        fillOpacity: 1
+                    }).addTo(map);
                 }
             });
-            document.getElementById('vio_sig_list').innerHTML = window.activeSigs.map((s,i)=>`<option value="${i}">${s.n}</option>`).join('');
-            document.getElementById('violation_panel').style.display='block';
-        } else { alert("No RTIS data found between these stations!"); }
-    }});
+
+            /* ---- UPDATE VIOLATION PANEL ---- */
+            document.getElementById('vio_sig_list').innerHTML =
+                window.activeSigs
+                    .map((s, i) => `<option value="${i}">${s.n}</option>`)
+                    .join('');
+
+            document.getElementById('violation_panel').style.display = 'block';
+        }
+    });
 }
