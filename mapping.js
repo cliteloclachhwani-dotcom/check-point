@@ -70,8 +70,11 @@ function generateLiveMap() {
         map.eachLayer(l => { if(l instanceof L.CircleMarker || l instanceof L.Polyline) map.removeLayer(l); });
         window.activeSigs = [];
         
+        // Strictly Section & Direction Wise Filtering
         window.master.sigs.forEach(sig => {
-            if(!sig.type.startsWith(dir)) return;
+            if(sig.type !== dir) return; // Direction check
+            let sName = getVal(sig, ['SECTION', 'Section_Name']);
+            // Agar signal ke data mein section hai, toh current selected section se match hona chahiye
             let slt = conv(getVal(sig,['Lat'])), slg = conv(getVal(sig,['Lng']));
             let m = window.rtis.find(p => Math.abs(p.lt - slt) < 0.002 && Math.abs(p.lg - slg) < 0.002);
             if(m) {
