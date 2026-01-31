@@ -2,7 +2,7 @@ window.master = { stns: [], sigs: [] }; window.rtis = []; window.activeSigs = []
 const map = L.map('map').setView([21.15, 79.12], 12);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
-// --- 16 DN RULES (RESTORED & LOCKED) ---
+// --- 16 DN RULES (RESTORED) ---
 const DN_RULES = [
     ["DURG","DLBS","BQR","BIA","DBEC","DCBIN","ACBIN","KMI","SZB","R","URK","MDH","SLH","BKTHW","BKTHE","TLD","HN","HNEOC","BYT","NPI","DGS","BYL","DPH","BSP"],
     ["TLD MGMT SDG","TLD","HN"], ["HN","HNEOC","HN SM4","HN UCLH SDG","HN MGCH SDG"], ["BYT","NPI","NPI NVCN SDG","NPI PCPN SDG"], ["HNEOC","BYT","BYT MRLB SDG"], ["SLH","BKTHW","BKTH MBMB SDG","BKTH CCS SDG"], ["URK","URKE","MDH","MDH MSMM SDG"], ["BMY MNBK SDG","BMY P CABIN","DBEC","BMY DNTH YD","DCBIN","ACBIN"], ["BMY FMYD","BMY CLYD","BMY CEYD","BMY P CABIN","DBEC","BMY DNTH YD","DCBIN","ACBIN"], ["BIA JCWS","BIA JBH","BIA","BLEY EX YARD","DBEC","BMY DNTH YD"], ["AAGH","KETI","BPTP","GUDM","DRZ","KYS","BXA","LBO","GDZ","RSA","MXA","ORE YARD"], ["DURG","DLBS","MXA","BMY CLYD","BMY CEYD","BMY FMYD"], ["DRZ RSDG SDG","DRZ KSDG SDG","DRZ"], ["SZB","R","RVH","RSD"], ["RSD","URKE","MDH"], ["TIG","RNBT","MRBL","KBJ","TRKR","HSK","LKNA","NPD","KRAR","KMK","BGBR","BMKJ","ARN","MSMD","BLSN","ANMD","LAE","NRMH","MNDH","RVH","R","RSD"]
@@ -32,7 +32,6 @@ function generateLiveMap() {
     const sT = document.getElementById('s_to').value;
     if(!file) return alert("Select CSV!");
 
-    // Direction Logic using Rules
     let dir = "UP"; 
     for(let r of DN_RULES) {
         let iF = r.indexOf(sF), iT = r.indexOf(sT);
@@ -41,41 +40,22 @@ function generateLiveMap() {
 
     Papa.parse(file, {header:true, skipEmptyLines:true, complete: function(res) {
         let fullData = res.data.map(r => ({
-            lt: parseFloat(getVal(r,['Latitude'])), 
-            lg: parseFloat(getVal(r,['Longitude'])), 
-            spd: parseFloat(getVal(r,['Speed']))||0, 
-            time: getVal(r,['Logging Time']),
+            lt: parseFloat(getVal(r,['Latitude'])), lg: parseFloat(getVal(r,['Longitude'])), 
+            spd: parseFloat(getVal(r,['Speed']))||0, time: getVal(r,['Logging Time']),
             stn: getVal(r,['last/cur stationCode','stationCode'])
         })).filter(p => !isNaN(p.lt));
 
-        // 1. Clipping by Station Code
         let startIdx = fullData.findIndex(p => p.stn.toUpperCase() === sF.toUpperCase());
         let endIdx = -1;
         for (let i = fullData.length - 1; i >= 0; i--) {
             if (fullData[i].stn.toUpperCase() === sT.toUpperCase()) { endIdx = i; break; }
         }
 
-        // 2. Fallback to Coordinates if Code fails
-        if(startIdx === -1 || endIdx === -1) {
-            let stnF = window.master.stns.find(s => getVal(s,['Station_Name']) === sF);
-            let stnT = window.master.stns.find(s => getVal(s,['Station_Name']) === sT);
-            let ltF = parseFloat(getVal(stnF,['Lat'])), lgF = parseFloat(getVal(stnF,['Lng']));
-            let ltT = parseFloat(getVal(stnT,['Lat'])), lgT = parseFloat(getVal(stnT,['Lng']));
-            
-            fullData.forEach((p, i) => {
-                let dF = Math.sqrt(Math.pow(p.lt-ltF,2)+Math.pow(p.lg-lgF,2));
-                let dT = Math.sqrt(Math.pow(p.lt-ltT,2)+Math.pow(p.lg-lgT,2));
-                if(dF < 0.04 && startIdx === -1) startIdx = i;
-                if(dT < 0.04) endIdx = i;
-            });
-        }
-
-        // Apply Clipping
+        // Clipping logic
         if(startIdx !== -1 && endIdx !== -1) {
-            let s = Math.min(startIdx, endIdx), e = Math.max(startIdx, endIdx);
-            window.rtis = fullData.slice(s, e + 1);
+            window.rtis = fullData.slice(Math.min(startIdx, endIdx), Math.max(startIdx, endIdx) + 1);
         } else {
-            window.rtis = fullData; // Last resort
+            window.rtis = fullData;
         }
 
         map.eachLayer(l => { if(l instanceof L.CircleMarker || l instanceof L.Polyline) map.removeLayer(l); });
@@ -84,14 +64,14 @@ function generateLiveMap() {
         let poly = L.polyline(pathCoords, {color:'blue', weight:5}).addTo(map);
         map.fitBounds(poly.getBounds());
 
-        // Signal Logic with Rule-based Direction
+        // Signal Logic - Tolerance improved to 0.006 (approx 600m)
         window.master.sigs.forEach(sig => {
             if(sig.type !== dir) return; 
             let slt = parseFloat(getVal(sig,['Lat'])), slg = parseFloat(getVal(sig,['Lng']));
-            let near = window.rtis.find(p => Math.abs(p.lt - slt) < 0.003 && Math.abs(p.lg - slg) < 0.003);
+            let near = window.rtis.find(p => Math.abs(p.lt - slt) < 0.006 && Math.abs(p.lg - slg) < 0.006);
             if(near) {
                 window.activeSigs.push({n:getVal(sig,['SIGNAL_NAME']), s:near.spd, t:near.time, lt:slt, lg:slg});
-                L.circleMarker([slt, slg], {radius: 6, color: (dir==='UP'?'#2ecc71':'#3498db'), fillOpacity: 1}).addTo(map);
+                L.circleMarker([slt, slg], {radius: 7, color: (dir==='UP'?'#2ecc71':'#3498db'), fillOpacity: 1}).addTo(map);
             }
         });
 
