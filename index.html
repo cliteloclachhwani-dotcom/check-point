@@ -8,30 +8,27 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
     <style>
         body { margin: 0; font-family: sans-serif; display: flex; height: 100vh; background: #f4f4f4; }
-        #controls { width: 360px; padding: 15px; background: #2c3e50; color: white; overflow-y: auto; z-index: 1000; box-shadow: 2px 0 10px rgba(0,0,0,0.5); }
+        #controls { width: 360px; padding: 15px; background: #2c3e50; color: white; overflow-y: auto; z-index: 1000; }
         #map { flex: 1; }
         .group { background: rgba(255,255,255,0.1); padding: 12px; border-radius: 6px; margin-bottom: 15px; border-left: 4px solid #3498db; }
         label { display: block; font-size: 11px; color: #bdc3c7; margin-bottom: 4px; text-transform: uppercase; font-weight: bold; }
-        /* Har input box me text BOLD dikhega */
         input, select { width: 100%; padding: 8px; margin-bottom: 8px; border-radius: 4px; border: none; font-size: 13px; font-weight: bold; }
         button { width: 100%; padding: 12px; cursor: pointer; font-weight: bold; border-radius: 4px; border: none; }
         .btn-green { background: #27ae60; color: white; }
         .btn-blue { background: #2980b9; color: white; margin-top: 10px; }
-        h3 { color: #3498db; text-align: center; border-bottom: 1px solid #34495e; padding-bottom: 10px; margin-top: 0; font-weight: bold; }
-        /* File upload hote hi box Green ho jayega */
         input[type="file"].uploaded { background: #27ae60 !important; color: white; }
     </style>
 </head>
 <body>
 <div id="controls">
-    <h3>TELOC CELL SECR</h3>
+    <h3 style="text-align:center; color:#3498db;">TELOC CELL SECR</h3>
     <div class="group">
         <label>RTIS CSV File</label>
         <input type="file" id="csv_file" onchange="this.classList.add('uploaded')">
         <label>Audit Date</label><input type="date" id="rep_date">
-        <label>Loco Number</label><input type="text" id="rep_loco" placeholder="Enter Loco No">
-        <label>Train Number</label><input type="text" id="rep_train" placeholder="Enter Train No">
-        <label>LP ID</label><input type="text" id="rep_lp" placeholder="Enter LP ID">
+        <label>Loco Number</label><input type="text" id="rep_loco" placeholder="Loco No">
+        <label>Train Number</label><input type="text" id="rep_train" placeholder="Train No">
+        <label>LP ID</label><input type="text" id="rep_lp" placeholder="LP ID">
     </div>
     <div class="group">
         <label>From Station</label><select id="s_from"></select>
