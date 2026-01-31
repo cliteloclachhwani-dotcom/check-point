@@ -20,7 +20,7 @@ function getVal(row, keys) {
     return f ? row[f] : null; 
 }
 
-// Distance Helper for cropping
+// More robust distance check
 function getDist(l1, g1, l2, g2) {
     return Math.sqrt(Math.pow(l1 - l2, 2) + Math.pow(g1 - g2, 2));
 }
@@ -44,7 +44,6 @@ function generateLiveMap() {
     const sT = document.getElementById('s_to').value;
     if(!file) return alert("Select CSV!");
 
-    // Direction logic based on DN_RULES
     let dir = "UP"; 
     for(let r of DN_RULES) {
         let iF = r.indexOf(sF), iT = r.indexOf(sT);
@@ -57,14 +56,13 @@ function generateLiveMap() {
             spd: parseFloat(getVal(r,['Spd','Speed']))||0, time: getVal(r,['Time','Logging Time'])
         })).filter(p => !isNaN(p.lt) && p.lt !== 0);
 
-        // Crop logic with tolerance
         let stnF = window.master.stns.find(s => getVal(s,['Station_Name']) === sF);
         let stnT = window.master.stns.find(s => getVal(s,['Station_Name']) === sT);
         let ltF = conv(getVal(stnF,['Lat'])), lgF = conv(getVal(stnF,['Lng']));
         let ltT = conv(getVal(stnT,['Lat'])), lgT = conv(getVal(stnT,['Lng']));
 
         let startIdx = -1, endIdx = -1;
-        let dF_min = 99, dT_min = 99;
+        let dF_min = 1.0, dT_min = 1.0; // Strictly within ~100km max to avoid Jalgaon jump
 
         fullData.forEach((p, i) => {
             let dF = getDist(p.lt, p.lg, ltF, lgF);
@@ -73,9 +71,9 @@ function generateLiveMap() {
             if(dT < dT_min) { dT_min = dT; endIdx = i; }
         });
 
-        // Agar station 5km ke radius mein bhi na mile toh error (Preventing total failure)
-        if(dF_min > 0.05 || dT_min > 0.05) {
-            alert("No RTIS points found near selected stations. Using full data.");
+        // Agar station bilkul nahi milta toh slice mat karo, alert do
+        if(startIdx === -1 || endIdx === -1) {
+            alert("Could not find stations in RTIS file. Showing full track.");
             window.rtis = fullData;
         } else {
             let s = Math.min(startIdx, endIdx);
@@ -90,15 +88,14 @@ function generateLiveMap() {
         L.polyline(pathCoords, {color:'blue', weight:5}).addTo(map);
         map.fitBounds(L.polyline(pathCoords).getBounds());
 
-        // Signal filtering
         window.master.sigs.forEach(sig => {
             if(sig.type !== dir) return; 
             let slt = conv(getVal(sig,['Lat'])), slg = conv(getVal(sig,['Lng']));
-            let near = window.rtis.find(p => Math.abs(p.lt - slt) < 0.002 && Math.abs(p.lg - slg) < 0.002);
+            // Checking if signal is along the cropped RTIS path
+            let near = window.rtis.find(p => Math.abs(p.lt - slt) < 0.003 && Math.abs(p.lg - slg) < 0.003);
             if(near) {
                 window.activeSigs.push({n:getVal(sig,['SIGNAL_NAME']), s:near.spd, t:near.time, lt:slt, lg:slg});
-                let clr = (sig.type==='UP'?'#2ecc71':'#3498db');
-                L.circleMarker([slt, slg], {radius: 6, color: clr, fillOpacity: 1}).addTo(map);
+                L.circleMarker([slt, slg], {radius: 6, color: (sig.type==='UP'?'#2ecc71':'#3498db'), fillOpacity: 1}).addTo(map);
             }
         });
 
